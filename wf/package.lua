@@ -1,18 +1,25 @@
+--- Package management/querying utilities.
+-- @module wf.package
+-- @alias M
+
 local stringx = require("pl.stringx")
 local wfpath = require("wf.path")
 local wfutil = require("wf.util")
 local M = {}
 
-local function installed(name)
+--- Check if a package is installed.
+-- @tparam string name The name of the package.
+-- @treturn bool True if the package is installed.
+function M.installed(name)
     local success = wfutil.execute(
         wfpath.executable("wf-pacman"), {"-Qs", name},
         wfutil.OUTPUT_NONE
     )
     return success
 end
-M.installed = installed
 
-local function version(name)
+--[[
+function M.version(name)
     local success, code, stdout, stderr = wfutil.execute(
         wfpath.executable("wf-pacman"), {"-Q", name},
         wfutil.OUTPUT_CAPTURE
@@ -23,9 +30,10 @@ local function version(name)
         return nil
     end
 end
-M.version = version
+]]
 
-local function files(name)
+--[[
+function M.files(name)
     local success, code, stdout, stderr = wfutil.execute(
         wfpath.executable("wf-pacman"), {"-Fl", "--machinereadable", name},
         wfutil.OUTPUT_CAPTURE_BINARY
@@ -39,9 +47,10 @@ local function files(name)
     end
     return list
 end
-M.files = files
+]]
 
-local function file_owner(path)
+--[[
+function M.file_owner(path)
     local success, code, stdout, stderr = wfutil.execute(
         wfpath.executable("wf-pacman"), {"-F", "--machinereadable", path},
         wfutil.OUTPUT_CAPTURE_BINARY
@@ -54,6 +63,6 @@ local function file_owner(path)
         return nil, nil
     end
 end
-M.file_owner = file_owner
+]]
 
 return M

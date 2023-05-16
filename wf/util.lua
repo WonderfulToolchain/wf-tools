@@ -1,7 +1,15 @@
+--- Assorted utilities.
+-- @module wf.util
+-- @alias M
+
 local utils = require("pl.utils")
 local M = {}
 
-local function align_up_to(value, alignment)
+--- Align a number (by incrementing) or string (by padding with zeroes) up to a specified alignment.
+-- @tparam number|string value The value to be aligned.
+-- @tparam number alignment The alignment.
+-- @treturn number|string The aligned value.
+function M.align_up_to(value, alignment)
     if type(value) == "number" then
         return math.floor(math.ceil(i / alignment) * alignment)
     elseif type(value) == "string" then
@@ -11,9 +19,12 @@ local function align_up_to(value, alignment)
         error("invalid value type")
     end  
 end
-M.align_up_to = align_up_to
 
-local function next_power_of_two(i, min_size)
+--- Provide the next power of two for a given value.
+-- @tparam number i The given value.
+-- @tparam ?number min_size The minimum output value.
+-- @treturn number The next power of two for the given value.
+function M.next_power_of_two(i, min_size)
     min_size = min_size or 0
     if i < min_size then
         i = min_size
@@ -26,13 +37,13 @@ local function next_power_of_two(i, min_size)
     i = i | (i >> 16)
     return i + 1
 end
-M.next_power_of_two = next_power_of_two
 
 M.OUTPUT_NONE = 0
 M.OUTPUT_SHELL = 1
 M.OUTPUT_CAPTURE = 2
 M.OUTPUT_CAPTURE_BINARY = 3
-local function execute(command, args, output_mode)
+--- Execute a given command with the specified arguments.
+function M.execute(command, args, output_mode)
     local cmd = command .. " " .. utils.quote_arg(args)
     if output_mode == 1 then
         return os.execute(cmd)
@@ -45,6 +56,5 @@ local function execute(command, args, output_mode)
         end
     end
 end
-M.execute = execute
 
 return M
