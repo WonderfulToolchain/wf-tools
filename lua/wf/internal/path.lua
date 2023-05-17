@@ -1,5 +1,5 @@
 --- Path querying.
--- @module wf.path
+-- @module wf.internal.path
 -- @alias M
 
 local compat = require("pl.compat")

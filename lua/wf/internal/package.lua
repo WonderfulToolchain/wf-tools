@@ -1,10 +1,10 @@
 --- Package management/querying utilities.
--- @module wf.package
+-- @module wf.internal.package
 -- @alias M
 
 local stringx = require("pl.stringx")
-local wfpath = require("wf.path")
-local wfutil = require("wf.util")
+local wfpath = require("wf.internal.path")
+local wfutil = require("wf.internal.util")
 local M = {}
 
 --- Check if a package is installed.
