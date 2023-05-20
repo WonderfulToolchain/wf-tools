@@ -1,21 +1,10 @@
 #!/opt/wonderful/bin/wf-lua
-lfs = require('lfs')
-lapp = require('pl.lapp')
-path = require('pl.path')
+local lfs = require('lfs')
+local lapp = require('pl.lapp')
+local path = require('pl.path')
+local wfutil = require('wf.internal.util')
 
 ---- Utility functions
-
---- Convert a string into a valid C identifier.
--- The following rules are used:
--- 1. Any character which is not alphanumeric is turned into an underscore.
--- 2. If the string starts with a number, an additional underscore is appended.
-function to_c_identifier(s)
-  s = s:gsub("[^a-zA-Z0-9_]", "_")
-  if not s:sub(1, 1):match("[_a-zA-Z]") then
-    s = "_" .. s
-  end
-  return s
-end
 
 ---- Program
 
@@ -52,7 +41,7 @@ else
     output_path, output_path_ext = path.splitext(path.basename(args.input_file))
   end
 end
-array_name = to_c_identifier(array_name)
+array_name = wfutil.to_c_identifier(array_name)
 
 output_path = path.join(args.output_dir, output_path)
 if #output_path_ext > 0 then

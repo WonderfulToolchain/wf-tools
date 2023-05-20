@@ -49,6 +49,9 @@ M.SAVE_TYPES_BY_NAME = {
 -- @tparam number count The number of occurences of the given byte.
 -- @treturn number The calculated checksum.
 function M.calculate_rom_padding_checksum(pad, count)
+    if count < 0 then
+        error("invalid pad count: " .. count)
+    end
     return ((pad & 0xFF) * (count & 0xFFFF)) & 0xFFFF
 end
 
@@ -57,6 +60,7 @@ end
 -- @treturn number The calculated checksum.
 function M.calculate_rom_checksum(...)
     local checksum = 0
+    local bytes_read = 0
     for i, value in ipairs(arg) do
         if type(value) == "number" then
             checksum = (checksum + value) & 0xFFFF
@@ -64,13 +68,16 @@ function M.calculate_rom_checksum(...)
             for k = 1, #value do
                 checksum = (checksum + value:byte(k, k)) & 0xFFFF
             end
+            bytes_read = bytes_read + #value
         elseif type(value) == "table" then
-            checksum = (checksum + M.calculate_rom_checksum(unpack(value))) & 0xFFFF
+            local v_checksum, v_bytes_read = M.calculate_rom_checksum(table.unpack(value))
+            checksum = (checksum + v_checksum) & 0xFFFF
+            bytes_read = bytes_read + v_bytes_read
         else
             error("unsupported value type")
         end
     end
-    return checksum
+    return checksum, bytes_read
 end
 
 --- Create a ROM header for the specified checksum and settings.

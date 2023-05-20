@@ -7,13 +7,14 @@ local M = {}
 --- Align a number (by incrementing) or string (by padding with zeroes) up to a specified alignment.
 -- @tparam number|string value The value to be aligned.
 -- @tparam number alignment The alignment.
+-- @tparam ?number pad_value The padding value, for strings.
 -- @treturn number|string The aligned value.
-function M.pad_alignment_to(value, alignment)
+function M.pad_alignment_to(value, alignment, pad_value)
     if type(value) == "number" then
-        return math.floor(math.ceil(i / alignment) * alignment)
+        return math.floor(math.ceil(value / alignment) * alignment)
     elseif type(value) == "string" then
         local bytes_to_append = M.pad_alignment_to(#value, alignment) - #value
-        return value + string.char(0):rep(bytes_to_append)
+        return value .. string.char(pad_value or 0):rep(bytes_to_append)
     else
         error("invalid value type")
     end  

@@ -19,6 +19,7 @@ local tmp_directory_mt = {
         end
     end
 }
+tmp_directory_mt["__gc"] = tmp_directory_mt["__close"]
 local function tmp_directory_path(obj, ...)
     return path.join(obj.name, table.unpack({...}))
 end

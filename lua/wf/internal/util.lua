@@ -32,4 +32,26 @@ function M.execute(command, args, output_mode)
     end
 end
 
+--- Convert a string into a valid C identifier.
+-- The following rules are used:
+-- 1. Any character which is not alphanumeric is turned into an underscore.
+-- 2. If the string starts with a number, an additional underscore is appended.
+function M.to_c_identifier(s)
+  s = s:gsub("[^a-zA-Z0-9_]", "_")
+  if not s:sub(1, 1):match("[_a-zA-Z]") then
+    s = "_" .. s
+  end
+  return s
+end
+
+--- Get the current script name.
+-- @treturn string The current script name.
+function M.script_name()
+    if arg then
+        return arg[0]:gsub(".+[\\/]", ""):gsub("%.%w+$", "")
+    else
+        return "unknown"
+    end
+end
+
 return M
