@@ -17,7 +17,11 @@ M.OUTPUT_CAPTURE_BINARY = 3
 function M.execute(command, args, output_mode)
     local cmd = command .. " " .. utils.quote_arg(args)
     if output_mode == 1 then
-        return os.execute(cmd)
+        local success, exit_type, code = os.execute(cmd)
+        if exit_type ~= "exit" then
+            code = nil
+        end
+        return success == true, code
     else
         local success, code, stdout, stderr = utils.executeex(cmd, output_mode == 3)
         if output_mode == 0 then

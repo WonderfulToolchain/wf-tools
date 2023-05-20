@@ -20,7 +20,7 @@ local tmp_directory_mt = {
     end
 }
 local function tmp_directory_path(obj, ...)
-    return path.join(obj.name, table.unpack(arg))
+    return path.join(obj.name, table.unpack({...}))
 end
 
 --- Create a temporary directory, which supports automatic tree removal using a to-be-closed variable.
