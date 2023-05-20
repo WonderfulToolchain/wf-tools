@@ -233,9 +233,6 @@ MEMORY
     __ldata = SIZEOF(.data);
     "__lwdata!" = 0;
     __lwdata = (__ldata + 1) / 2;
-    /* legacy - TODO: remove */
-    "__ldata_words!" = 0;
-    __ldata_words = (__ldata + 1) / 2;
 
     __sbss = .;
     .bss . (NOLOAD) :
@@ -247,9 +244,6 @@ MEMORY
     __lbss = SIZEOF(.bss);
     "__lwbss!" = 0;
     __lwbss = (__lbss + 1) / 2;
-    /* legacy - TODO: remove */
-    "__lbss_words!" = 0;
-    __lbss_words = (__lbss + 1) / 2;
 
     . = ]] .. (section[3] + 1) .. [[;
     "__eheap!" = 0;

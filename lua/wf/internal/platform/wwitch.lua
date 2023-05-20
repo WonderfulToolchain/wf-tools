@@ -6,7 +6,6 @@
 -- @alias M
 
 local wfstring = require("wf.string")
-local wfstruct = require("wf.struct")
 local M = {}
 
 --- FreyaOS file attribute flags.
@@ -25,6 +24,10 @@ function M.file_attributes_to_integer(mode)
     if type(mode) == "number" then
         return mode
     elseif type(mode) == "string" then
+        local mode_int = tonumber(mode)
+        if mode_int ~= nil then
+            return mode_int
+        end
         local result = 0
         for i = 1, #mode do
             local flag = mode:sub(i, i)
@@ -39,11 +42,15 @@ function M.file_attributes_to_integer(mode)
     end
 end
 
+function M.unix_to_freya_time(value)
+    return math.min(0x7FFFFFFF, math.max(0, value - 946080000))
+end
+
 function M.create_fent_header(settings)
     local xmodem_chunk_count = (settings.length + 127) >> 7
     local mode = M.file_attributes_to_integer(settings.mode or 7)
     -- seconds since January 1st, 2000
-    local mtime = math.min(0x7FFFFFFF, math.max(0, (settings.mtime or os.time()) - 946080000))
+    local mtime = M.unix_to_freya_time(settings.mtime or os.time())
     local resource_start = 0xFFFFFFFF
     if settings.resource then
         resource_start = settings.length
