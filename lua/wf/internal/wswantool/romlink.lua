@@ -1,3 +1,6 @@
+-- SPDX-License-Identifier: MIT
+-- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
+
 local path = require('pl.path')
 local tablex = require('pl.tablex')
 local utils = require('pl.utils')

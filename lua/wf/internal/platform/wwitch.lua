@@ -1,3 +1,6 @@
+-- SPDX-License-Identifier: MIT
+-- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
+
 --- Helpers for the "wwitch" target.
 -- @module wf.internal.platform.wwitch
 -- @alias M

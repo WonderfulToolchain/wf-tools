@@ -1,3 +1,6 @@
+-- SPDX-License-Identifier: MIT
+-- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
+
 local lapp = require('pl.lapp')
 local tablex = require('pl.tablex')
 local wftempfile = require('wf.internal.tempfile')

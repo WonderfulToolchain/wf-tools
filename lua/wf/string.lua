@@ -1,3 +1,6 @@
+-- SPDX-License-Identifier: MIT
+-- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
+
 --- String-related utilities.
 -- @module wf.string
 -- @alias M

@@ -1,4 +1,7 @@
 #!/opt/wonderful/bin/wf-lua
+-- SPDX-License-Identifier: MIT
+-- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
+
 local lfs = require('lfs')
 local lapp = require('pl.lapp')
 local path = require('pl.path')

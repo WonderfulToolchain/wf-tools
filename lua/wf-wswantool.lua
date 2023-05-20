@@ -1,4 +1,7 @@
 #!/opt/wonderful/bin/wf-lua
+-- SPDX-License-Identifier: MIT
+-- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
+
 local tablex = require('pl.tablex')
 
 --- Convert an user-provided memory layout to a linklayout.
