@@ -96,6 +96,8 @@ local function romlink_run(args, linker_args)
     local rom_layout = {}
     local constants = {}
 
+    constants["__wf_rom_bank_offset"] = 0
+
     local rom_load_offset
     if config.cartridge.start_segment and config.cartridge.start_offset then
         rom_load_offset = (config.cartridge.start_segment * 16) + config.cartridge.start_offset
@@ -108,6 +110,16 @@ local function romlink_run(args, linker_args)
         config.cartridge.start_segment = rom_load_offset >> 4
         config.cartridge.start_offset = 0
     end
+    if (rom_load_offset < 0x40000) or (rom_load_offset >= 0xFFFF0) then
+        error(string.format("ROM load offset outside of linear bank: 0x%05X", rom_load_offset))
+    end
+        
+    -- Calculate ROM size.
+    local rom_pad_byte = 0xFF
+    local rom_pad_char = string.char(rom_pad_byte)
+    local rom_size, rom_size_bytes = romlink_calc_rom_size(config, rom_layout, rom_load_offset)
+    config.cartridge.rom_size = rom_size
+    constants["__wf_rom_bank_offset"] = 0x10000 - (rom_size_bytes >> 16)
 
     -- Link code at the calculated ROM location.
     local code_bin_path = temp_dir:path('stage2.bin')
@@ -118,10 +130,6 @@ local function romlink_run(args, linker_args)
     code_bin = wfmath.pad_alignment_to(code_bin, 16)
     print_verbose(string.format("romlink: program size is %d bytes, load at %04X:%04X", #code_bin, config.cartridge.start_segment, config.cartridge.start_offset))
     
-    local rom_pad_byte = 0xFF
-    local rom_pad_char = string.char(rom_pad_byte)
-    local rom_size, rom_size_bytes = romlink_calc_rom_size(config, rom_layout, rom_load_offset)
-    config.cartridge.rom_size = rom_size
     rom_layout[rom_size_bytes - (0x100000 - rom_load_offset)] = code_bin
 
     local checksum, bytes_read = wswan.calculate_rom_checksum(code_bin, tablex.values(rom_layout))
@@ -158,12 +166,3 @@ wf-wswantool romlink [args] -- <linker args>: assemble a wswan target ROM
     ["description"] = "assemble a wswan target ROM",
     ["run"] = romlink_run
 }
-
---[[
-rom_write_linkscript(file, linklayout, {["__wf_rom_bank_offset"]=0xF0}, 0x20000, 0xD0000)
-
-config.cartridge.start_segment = 0xF000
-config.cartridge.start_offset = 0x0000
-config.cartridge.rom_size = 0x02
-local header = wswan.create_rom_header(0, config.cartridge)
-]]
