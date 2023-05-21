@@ -12,8 +12,10 @@ local tablex = require('pl.tablex')
 -- - ss: stack segment value
 -- - sp: stack pointer value
 -- ROM areas are currently not handled by the linklayout.
-function rom_layout_to_linklayout(layout)
+function rom_memory_to_linklayout(memory)
+    local layout = memory.layout
     local result = {["ds"]=nil, ["ss"]=nil, ["sp"]=nil, ["iram"]={}, ["sram"]={}}
+    result.model = memory.model or "medium"
 
     -- validate layout keys
     for k, v in pairs(layout) do
@@ -80,6 +82,7 @@ function rom_write_linkscript(f, linklayout, constants, rom_start, rom_length)
     constants = tablex.copy(constants)
     constants["__wf_stack_pointer"] = linklayout.sp
 
+    local is_far_text = linklayout.model == "medium" or linklayout.model == "large" or linklayout.model == "huge"
     local memory_regions = {
         ["IRAM"] = {0x00000, 0x10000, "wx"},
         ["SRAM"] = {0x10000, 0x10000, "wx"},
@@ -116,6 +119,16 @@ MEMORY
         "__stext!" = .;
         KEEP(*(".start!"))
         *(".text!*" ".text.*!")
+]])
+
+    if not is_far_text then
+        f:write([[
+        *(".fartext!*" ".fartext.*!")
+        *(".farrodata!*" ".farrodata.*!")
+]])
+    end
+
+f:write([[
         "__etext!" = .;
     } >ROM
 
@@ -124,6 +137,16 @@ MEMORY
         __stext = .;
         KEEP(*(".start"))
         *(.text ".text.*[^&]")
+]])
+
+    if not is_far_text then
+        f:write([[
+        *(".fartext.*[^&]")
+        *(".farrodata.*[^&]")
+]])
+    end
+    
+    f:write([[
         __etext = .;
         . = ALIGN (16);
     }
@@ -141,8 +164,21 @@ MEMORY
         "__stext&" = .;
         KEEP(*(".start&"))
         *(".text&*" ".text.*&")
+]])
+
+    if not is_far_text then
+        f:write([[
+        *(".fartext&*" ".fartext.*&")
+        *(".farrodata&*" ".farrodata.*&")
+]])
+    end
+
+    f:write([[
         "__etext&" = .;
     }
+]])
+    if is_far_text then
+        f:write([[
 
     .fartext ALIGN (0x10) : SUBALIGN (0x10) {
         *(SORT (".fartext!*"))
@@ -159,6 +195,10 @@ MEMORY
         *(SORT (".farrodata.*"))
         . = .;
     }
+]])
+    end
+
+    f:write([[
 
     .erom . (NOLOAD) :
     {

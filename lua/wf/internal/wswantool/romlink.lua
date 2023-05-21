@@ -92,7 +92,7 @@ end
 
 local function romlink_run(args, linker_args)
     local config = toml.decodeFromFile(args.config or "wfconfig.toml")
-    local linklayout = rom_layout_to_linklayout(config.memory.layout)
+    local linklayout = rom_memory_to_linklayout(config.memory)
     local rom_layout = {}
     local constants = {}
 
