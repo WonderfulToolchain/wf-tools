@@ -10,8 +10,8 @@ local wfpath = require('wf.internal.path')
 local wfutil = require('wf.internal.util')
 local wswan = require('wf.internal.platform.wswan')
 
-local function romlink_call_linker(linklayout, constants, output_elf, output_file, rom_start, rom_length, linker_args)
-    local linkscript_filename = temp_dir:path('linkscript.ld')
+local function romlink_call_linker(linklayout, constants, linkscript_name, output_elf, output_file, rom_start, rom_length, linker_args)
+    local linkscript_filename = temp_dir:path(linkscript_name)
     local linkscript_file = io.open(linkscript_filename, 'w')
     rom_write_linkscript(linkscript_file, linklayout, constants, rom_start, rom_length)
     linkscript_file:close()
@@ -36,7 +36,7 @@ end
 local function romlink_measure_code_size(linklayout, constants, linker_args)
     local elf_path = temp_dir:path('stage1.elf')
     local bin_path = temp_dir:path('stage1.bin')
-    romlink_call_linker(linklayout, constants, elf_path, bin_path, 0x40000, 0xC0000, linker_args)
+    romlink_call_linker(linklayout, constants, 'stage1.ld', elf_path, bin_path, 0x40000, 0xC0000, linker_args)
     local attrs = lfs.attributes(bin_path)
     return wfmath.pad_alignment_to(attrs.size, 16)
 end
@@ -50,6 +50,16 @@ local function rom_layout_size(layout)
         end
     end
     return size
+end
+
+local function rom_layout_start(layout)
+    local start = nil
+    for k, v in pairs(layout) do
+        if (start == nil) or (k < start) then
+            start = k
+        end
+    end
+    return start or 0
 end
 
 local function rom_layout_add(layout, position, data, data_name)
@@ -123,8 +133,12 @@ local function romlink_run(args, linker_args)
 
     -- Link code at the calculated ROM location.
     local code_bin_path = temp_dir:path('stage2.bin')
-    romlink_call_linker(linklayout, constants, args.output_elf or temp_dir:path('stage2.elf'), code_bin_path, rom_load_offset, 0x100000 - wswan.ROM_HEADER_SIZE - rom_load_offset, linker_args)
+    romlink_call_linker(linklayout, constants, 'stage2.ld', args.output_elf or temp_dir:path('stage2.elf'), code_bin_path, rom_load_offset, 0x100000 - wswan.ROM_HEADER_SIZE - rom_load_offset, linker_args)
     local code_bin = utils.readfile(code_bin_path, true)
+
+    if (rom_load_offset + #code_bin) > 0xFFFF0 then
+        error(string.format("program size is %d bytes, too large to load at %04X:%04X", #code_bin, config.cartridge.start_segment, config.cartridge.start_offset))
+    end
 
     -- Prepare ROM data.
     code_bin = wfmath.pad_alignment_to(code_bin, 16)
@@ -140,7 +154,9 @@ local function romlink_run(args, linker_args)
     -- Build ROM.
     local rom_file <close> = io.open(args.output, "wb")
     local min_position = 0
-    -- TODO: Implement --trim somewhere around here.
+    if args.trim then
+        min_position = rom_layout_start(rom_layout)
+    end
     for i=1,(rom_size_bytes - min_position) do
         rom_file:write(rom_pad_char)
     end
@@ -159,7 +175,9 @@ wf-wswantool romlink [args] -- <linker args>: assemble a wswan target ROM
                                    wfconfig.toml is used by default.
   -o,--output   (string)           Output ROM file name.
   --output-elf  (optional string)  Output ELF file name;
-                                   only stored on request.                               
+                                   only stored on request.
+  --trim                           Trim the assembled ROM by removing unused
+                                   space from the beginning of the file.
   -v,--verbose                     Enable verbose logging.
 ]],
     ["argument_separator"] = "--",

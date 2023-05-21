@@ -7,7 +7,7 @@ local wftempfile = require('wf.internal.tempfile')
 local wfutil = require('wf.internal.util')
 
 local args
-temp_dir = wftempfile.create_directory(false)
+temp_dir = wftempfile.create_directory(true)
 
 function print_verbose(...)
     if args.verbose then
