@@ -13,7 +13,7 @@ local dir_separator = compat.dir_separator
 local base_dir, executable_extension
 if compat.is_windows then
     executable_extension = '.exe'
-    error('windows is not currently supported')
+    base_dir = '/opt/wonderful'
 else
     executable_extension = ''
     base_dir = '/opt/wonderful'
