@@ -51,34 +51,23 @@ function M.create_fent_header(settings)
     local mode = M.file_attributes_to_integer(settings.mode or 7)
     -- seconds since January 1st, 2000
     local mtime = M.unix_to_freya_time(settings.mtime or os.time())
-    local resource_start = 0xFFFFFFFF
+    local resource_start = -1
     if settings.resource then
         resource_start = settings.length
     end
 
-    -- TODO: Create struct-like library for this.
     return "#!ws" .. string.char(255):rep(60)
         .. wfstring.convert(settings.name, "sjis", "utf8", 16)
         .. wfstring.convert(settings.info or settings.name, "sjis", "utf8", 24)
-        .. string.char(
-            0, 0, 0, 0, -- TODO: unknown
-            (settings.length) & 0xFF,
-            (settings.length >> 8) & 0xFF,
-            (settings.length >> 16) & 0xFF,
-            (settings.length >> 24) & 0xFF,
-            (xmodem_chunk_count) & 0xFF,
-            (xmodem_chunk_count >> 8) & 0xFF,
-            (mode) & 0xFF,
-            (mode >> 8) & 0xFF,
-            (mtime) & 0xFF,
-            (mtime >> 8) & 0xFF,
-            (mtime >> 16) & 0xFF,
-            (mtime >> 24) & 0xFF,
-            0, 0, 0, 0, -- TODO: unknown
-            (resource_start) & 0xFF,
-            (resource_start >> 8) & 0xFF,
-            (resource_start >> 16) & 0xFF,
-            (resource_start >> 24) & 0xFF
+        .. string.pack(
+            "< I4 I4 I2 I2 I4 I4 i4",
+            0, -- TODO: unknown
+            settings.length,
+            xmodem_chunk_count,
+            mode,
+            mtime,
+            0, -- TODO: unknown
+            resource_start
         )
 end
 
