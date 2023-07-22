@@ -47,14 +47,16 @@ function M.unix_to_freya_time(value)
 end
 
 function M.create_fent_header(settings)
-    local xmodem_chunk_count = (settings.length + 127) >> 7
+    local total_length = settings.length
+    local resource_start = -1
+    if settings.resource then
+        total_length = total_length + settings.resource_length
+        resource_start = settings.length
+    end
+    local xmodem_chunk_count = (total_length + 127) >> 7
     local mode = M.file_attributes_to_integer(settings.mode or 7)
     -- seconds since January 1st, 2000
     local mtime = M.unix_to_freya_time(settings.mtime or os.time())
-    local resource_start = -1
-    if settings.resource then
-        resource_start = settings.length
-    end
 
     return "#!ws" .. string.char(255):rep(60)
         .. wfstring.convert(settings.name, "sjis", "utf8", 16)
@@ -62,7 +64,7 @@ function M.create_fent_header(settings)
         .. string.pack(
             "< I4 I4 I2 I2 I4 I4 i4",
             0, -- TODO: unknown
-            settings.length,
+            total_length,
             xmodem_chunk_count,
             mode,
             mtime,
