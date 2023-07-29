@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: MIT
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
+local stringx = require('pl.stringx')
 local tablex = require('pl.tablex')
 
 --- Convert an user-provided memory layout to a linklayout.
@@ -327,6 +328,42 @@ f:write([[
     -- generate RAM regions
     write_region("iram", 0x00000, linklayout.iram)
     write_region("sram", 0x10000, linklayout.sram)
+
+    -- generate debug sections
+    local function write_dummy_section(...)
+        local arg = {...}
+        f:write("    \"" .. arg[1] .. "!\" = 0;\n")
+        f:write("    " .. arg[1] .. " 0 : { *(" .. stringx.join(" ", arg) .. ") }\n")
+    end
+
+    -- DWARF
+    write_dummy_section(".debug")
+    write_dummy_section(".line")
+    write_dummy_section(".debug_srcinfo")
+    write_dummy_section(".debug_sfnames")
+    write_dummy_section(".debug_aranges")
+    write_dummy_section(".debug_pubnames")
+    write_dummy_section(".debug_info", ".gnu.linkonce.wi.*")
+    write_dummy_section(".debug_abbrev")
+    write_dummy_section(".debug_line", ".debug_line.*", ".debug_line_end")
+    write_dummy_section(".debug_frame")
+    write_dummy_section(".debug_str")
+    write_dummy_section(".debug_loc")
+    write_dummy_section(".debug_macinfo")
+    write_dummy_section(".debug_weaknames")
+    write_dummy_section(".debug_funcnames")
+    write_dummy_section(".debug_typenames")
+    write_dummy_section(".debug_varnames")
+    write_dummy_section(".debug_pubtypes")
+    write_dummy_section(".debug_ranges")
+    write_dummy_section(".debug_addr")
+    write_dummy_section(".debug_line_str")
+    write_dummy_section(".debug_loclists")
+    write_dummy_section(".debug_macro")
+    write_dummy_section(".debug_names")
+    write_dummy_section(".debug_rnglists")
+    write_dummy_section(".debug_str_offsets")
+    write_dummy_section(".debug_sup")
 
     f:write("}\n")
 end
