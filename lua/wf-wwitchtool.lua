@@ -4,5 +4,6 @@
 
 commands = {}
 commands.mkfent = require('wf.internal.wwitchtool.mkfent')
+commands.project = require('wf.internal.tool.project')('wwitch')
 
 require('wf.internal.tool')

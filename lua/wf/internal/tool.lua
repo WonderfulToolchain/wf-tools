@@ -2,6 +2,7 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
 local lapp = require('pl.lapp')
+local pretty = require('pl.pretty')
 local tablex = require('pl.tablex')
 local wftempfile = require('wf.internal.tempfile')
 local wfutil = require('wf.internal.util')
@@ -32,24 +33,43 @@ local function args_split2(arg_table, sep)
     end
 end
 
-if #arg < 1 or not commands[arg[1]] then
-    io.stderr:write(wfutil.script_name() .. ": ")
-    if #arg < 1 then
+local function has_subcommands(cmd)
+    return cmd.arguments == nil
+end
+
+local program_name = wfutil.script_name()
+local cmd = commands
+local cmd_arg = arg
+while cmd ~= nil and has_subcommands(cmd) and #cmd_arg > 0 and cmd[cmd_arg[1]] ~= nil do
+    program_name = program_name .. " " .. cmd_arg[1]
+    cmd = cmd[cmd_arg[1]]
+    cmd_arg = tablex.sub(cmd_arg, 2)
+end
+
+local function list_subcommands(cmds, prefix)
+    for k, v in tablex.sort(cmds) do
+        if has_subcommands(v) then
+            list_subcommands(v, prefix .. k .. " ")
+        else
+            io.stderr:write("\t" .. prefix .. k .. ": " .. v.description .. "\n")
+        end
+    end
+end
+
+if has_subcommands(cmd) then
+    io.stderr:write(program_name .. ": ")
+    if #cmd_arg < 1 then
         io.stderr:write("missing subcommand")
     else
-        io.stderr:write("unknown subcommand: " .. arg[1])
+        io.stderr:write("unknown subcommand: " .. cmd_arg[1])
     end
     io.stderr:write("\n\navailable subcommands:\n")
-    for k, v in tablex.sort(commands) do
-        io.stderr:write("\t" .. k .. ": " .. v.description .. "\n")
-    end
+    list_subcommands(cmd, "")
 else
-    local cmd = commands[arg[1]]
-    local cmd_arg = tablex.sub(arg, 2)
     local cmd_arg_other = nil
     if cmd.argument_separator then
         cmd_arg, cmd_arg_other = args_split2(cmd_arg, cmd.argument_separator)
     end
-    args = lapp(cmd.arguments, cmd_arg)
+    args = lapp(program_name .. " " .. cmd.arguments, cmd_arg)
     cmd.run(args, cmd_arg_other)
 end

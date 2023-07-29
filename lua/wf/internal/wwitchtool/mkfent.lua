@@ -72,7 +72,7 @@ end
 
 return {
     ["arguments"] = [[
-wf-wwitchtool mkfent: create .fx file
+mkfent: create .fx file
   -o,--output   (optional string)  The name for the output .fx file.
   -s,--source   (optional string)  The name for the file to be converted.
   --name        (optional string)  The name of the output .fx file.
