@@ -23,7 +23,7 @@ return function(target)
     end
 
     local function create_new_project(args)
-        local project_name = args.name or path.basename(args.directory)
+        local project_name = args.name or path.basename(stringx.rstrip(args.directory, " /\\")):gsub("[ /\\%$]", "")
         local template_path = get_template_path(args)
 
         print_verbose("copying template files")
