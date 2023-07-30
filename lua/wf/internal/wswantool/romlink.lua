@@ -170,7 +170,7 @@ end
 
 return {
     ["arguments"] = [[
-romlink [args] -- <linker args>: assemble a wswan target ROM
+[args...] -- <linker args...>: assemble a wswan target ROM
   -c,--config   (optional string)  Configuration file name;
                                    wfconfig.toml is used by default.
   -o,--output   (string)           Output ROM file name.

@@ -23,7 +23,7 @@ return function(target)
     end
 
     local function create_new_project(args)
-        local project_name = args.name
+        local project_name = args.name or path.basename(args.directory)
         local template_path = get_template_path(args)
 
         print_verbose("copying template files")
@@ -55,9 +55,9 @@ return function(target)
     local project = {}
     project.new = {
         ["arguments"] = [[
-<name> <directory> [args]: create a new project
-  <name>        (string)           Project name.
+<directory> [name] ...: create a new project
   <directory>   (string)           Project directory.
+  <name>        (optional string)  Project name.
   -t,--type     (optional string)  Project type.
   -v,--verbose                     Enable verbose logging.
 ]],

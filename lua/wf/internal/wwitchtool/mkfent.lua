@@ -72,7 +72,7 @@ end
 
 return {
     ["arguments"] = [[
-mkfent: create .fx file
+...: create .fx file
   -o,--output   (optional string)  The name for the output .fx file.
   -s,--source   (optional string)  The name for the file to be converted.
   --name        (optional string)  The name of the output .fx file.
