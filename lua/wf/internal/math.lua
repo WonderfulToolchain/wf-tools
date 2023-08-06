@@ -2,7 +2,7 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
 --- Math-related utilities.
--- @module wf.math
+-- @module wf.internal.math
 -- @alias M
 
 local M = {}

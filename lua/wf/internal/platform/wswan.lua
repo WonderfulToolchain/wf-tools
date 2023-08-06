@@ -5,7 +5,7 @@
 -- @module wf.internal.platform.wswan
 -- @alias M
 
-local wfmath = require("wf.math")
+local wfmath = require("wf.internal.math")
 local M = {}
 
 --- The size of the wswan ROM header, in bytes.

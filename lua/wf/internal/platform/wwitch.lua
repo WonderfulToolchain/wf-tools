@@ -5,7 +5,7 @@
 -- @module wf.internal.platform.wwitch
 -- @alias M
 
-local wfstring = require("wf.string")
+local wfstring = require("wf.internal.string")
 local M = {}
 
 --- FreyaOS file attribute flags.

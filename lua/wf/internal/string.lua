@@ -2,7 +2,7 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
 --- String-related utilities.
--- @module wf.string
+-- @module wf.internal.string
 -- @alias M
 
 local iconv = require("iconv")
