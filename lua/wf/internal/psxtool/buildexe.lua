@@ -3,14 +3,9 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2019, 2023
 
 local path = require('pl.path')
-local pretty = require('pl.pretty')
-local tablex = require('pl.tablex')
-local utils = require('pl.utils')
 local toml = require('toml')
 local wfelf = require('wf.internal.elf')
 local wfmath = require('wf.internal.math')
-local wfpath = require('wf.internal.path')
-local wfutil = require('wf.internal.util')
 local wfpsx = require('wf.internal.platform.psx')
 
 local function mkpsexe_run(args, linker_args)
