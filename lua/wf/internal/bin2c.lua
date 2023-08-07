@@ -20,15 +20,30 @@ function M.bin2c(c_file, h_file, program_name, entries)
 
     for array_name, entry in pairs(entries) do
         local data = entry.data
-        
+        local dtype = entry.type or "uint8_t"
+        local endian = entry.endian or "little"
+        local width
+        if dtype == "uint8_t" or dtype == "int8_t" then
+            width = 1
+        elseif dtype == "uint16_t" or dtype == "int16_t" then
+            width = 2
+        elseif dtype == "uint32_t" or dtype == "int32_t" then
+            width = 4
+        else
+            error("unsupported datatype: " .. dtype)
+        end
+        if endian ~= "little" and endian ~= "big" then
+            error("unsupported endianness: " .. endian)
+        end
+
         h_file:write("#define " .. array_name .. "_size (" .. #data .. ")\n")
-        h_file:write("extern const uint8_t ")
+        h_file:write("extern const " .. dtype .. " ")
         if entry.address_space then
             h_file:write(entry.address_space .. " ")
         end
         h_file:write(array_name .. "[" .. #data .. "];\n")
     
-        c_file:write("const uint8_t ")
+        c_file:write("const " .. dtype .. " ")
         if entry.address_space then
             c_file:write(entry.address_space .. " ")
         end
@@ -37,15 +52,33 @@ function M.bin2c(c_file, h_file, program_name, entries)
             c_file:write("__attribute__((aligned(" .. entry.align .. "))) ")
         end
         c_file:write("= {");
-        for i = 1, #data do
+        for i = 1, #data, width do
             i_line = i % c_values_per_line
             if i_line == 1 then
                 c_file:write("\n\t")
             else
                 c_file:write(" ")
             end
-            c_file:write(string.format("0x%02X", data:byte(i)))
-            if i < #data then
+            if type(data) == "string" then
+                if width == 1 then
+                    c_file:write(string.format("0x%02X", data:byte(i)))
+                elseif width == 2 then
+                    if endian == "big" then
+                        c_file:write(string.format("0x%02X%02X", data:byte(i), data:byte(i + 1) or 0))
+                    else
+                        c_file:write(string.format("0x%02X%02X", data:byte(i + 1) or 0, data:byte(i)))
+                    end
+                elseif width == 4 then
+                    if endian == "big" then
+                        c_file:write(string.format("0x%02X%02X%02X%02X", data:byte(i), data:byte(i + 1) or 0, data:byte(i + 2) or 0, data:byte(i + 3) or 0))
+                    else
+                        c_file:write(string.format("0x%02X%02X%02X%02X", data:byte(i + 3) or 0, data:byte(i + 2) or 0, data:byte(i + 1) or 0, data:byte(i)))
+                    end
+                end
+            else
+                c_file:write(string.format("%d", data[i]))
+            end
+            if i <= (#data - width) then
                 c_file:write(",")
             end
         end

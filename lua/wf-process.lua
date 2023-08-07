@@ -24,6 +24,7 @@ local format = args.format or "c"
 _WFPROCESS = {}
 _WFPROCESS.target = stringx.split(args.target or "", "/") or {}
 _WFPROCESS.temp_dir = wftempfile.create_directory(true)
+_WFPROCESS.verbose = args.verbose or false
 
 -- TODO: Move to somewhere else.
 local default_bin2c_args = {}
@@ -158,6 +159,7 @@ senv.files = function(...)
             end
         end
         
+        table.sort(applicable_files, function(a, b) return a.file < b.file end)
     end
 
     if #exts == 0 then
@@ -179,7 +181,6 @@ path.chdir(scwd)
 sinputs[args.script] = true
 scapture_enabled = true
 local result = loadfile(args.script, "bt", senv)()
-print(require("pl.pretty").write(result))
 
 -- Emit output files.
 if format == "c" then
@@ -189,12 +190,13 @@ if format == "c" then
     local wfbin2c = require("wf.internal.bin2c")
     local bin2c_entries = tablex.deepcopy(result)
     for entry_key, entry in pairs(bin2c_entries) do
+        entry = process.to_data(entry)
         for k, v in pairs(default_bin2c_args) do
             if entry[k] == nil then
                 entry[k] = v
             end
         end
-        bin2c_entries[entry_key] = process.to_data(entry)
+        bin2c_entries[entry_key] = entry
     end
     wfbin2c.bin2c(c_file, h_file, "wf-process", bin2c_entries)
 else
