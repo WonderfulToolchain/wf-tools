@@ -1,4 +1,4 @@
 project = 'wf-lua-tools'
 description = 'Wonderful toolchain Lua tools'
-file = {'wf'}
+file = {'wf/api'}
 format = 'discount'

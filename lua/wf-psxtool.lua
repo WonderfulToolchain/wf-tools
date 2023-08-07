@@ -5,6 +5,6 @@
 commands = {}
 commands.project = require('wf.internal.tool.project')('psx')
 commands.build = {}
-commands.build.exe = require('wf.internal.psxtool.buildexe')
+commands.build.exe = require('wf.internal.tool.psxtool.buildexe')
 
 require('wf.internal.tool')
