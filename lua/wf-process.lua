@@ -3,23 +3,42 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 local dir = require("pl.dir")
 local lapp = require("pl.lapp")
+local lfs = require("lfs")
 local path = require("pl.path")
 local stringx = require("pl.stringx")
 local tablex = require("pl.tablex")
 local wftempfile = require("wf.internal.tempfile")
 
 local args = lapp [[
-wf-process: script-driven asset generator
-  -o,--output     (string)           Output filename.
-                                     (the extension will be ignored)
+wf-process: script-driven asset pipeline tool
+
+This asset pipeline tool is meant to be used as part of a larger build script.
+For example, consider the following command line:
+
+wf-process -o build/assets/graphics/script.c
+           -f build/iso
+           -D
+           assets/graphics/script.lua
+
+This will create the following files:
+- build/assets/graphics/script.c (from -o)
+- build/assets/graphics/script.d (from -D)
+- build/.../*.h (from header filenames matching the provided files)
+- build/iso/graphics.dat (if such a file is requested)
+
+The build system is expected to process the .d file (if requested)
+and compile the .c file (likewise if requested).
+
+Tool arguments:
   <script>        (string)           Script filename.
   <args...>       (optional string)  Script inputs.
-  -t,--target     (optional string)  Target name.
-  -f,--format     (optional string)  Output format.
-  -D                                 Emit .d dependency files.
+  -f,--filesystem (optional string)  Filesystem directory.
+  -o,--output     (optional string)  Output file (.c).
+  -t,--target     (optional string)  Target name, in Wonderful convention.
+  --symbol-prefix (optional string)  Default symbol prefix.
+  -D                                 Emit .d dependency file.
   -v,--verbose                       Enable verbose output.
 ]]
-local format = args.format or "c"
 
 _WFPROCESS = {}
 _WFPROCESS.target = stringx.split(args.target or "", "/") or {}
@@ -121,9 +140,20 @@ end
 local spath = path.abspath(args.script)
 local sname = path.splitext(path.basename(spath))
 local scwd = path.normpath(path.join(spath, ".."))
-local soutput = path.splitext(args.output)
+local ocwd = path.normpath(path.join(args.output, ".."))
+local soutput, format = path.splitext(args.output)
 
 senv.args = args.args
+
+if args.filesystem then
+    _WFPROCESS.filesystem = {}
+end
+if format == ".c" then
+    local soutbase = path.splitext(path.basename(soutput))
+    _WFPROCESS.bin2c_default_header = soutbase .. ".h"
+    _WFPROCESS.bin2c_default_prefix = args.symbol_prefix or ""
+    _WFPROCESS.bin2c = {}
+end
 
 local applicable_files = nil
 senv.files = function(...)
@@ -177,30 +207,41 @@ senv.files = function(...)
 end
 
 -- Run the script.
+local old_cwd = lfs.currentdir()
+local script_func = assert(loadfile(args.script, "bt", senv))
 path.chdir(scwd)
 sinputs[args.script] = true
 scapture_enabled = true
-local result = loadfile(args.script, "bt", senv)()
+script_func()
+path.chdir(old_cwd)
 
 -- Emit output files.
-if format == "c" then
-    local c_file <close> = io.open(soutput .. ".c", "w")
-    local h_file <close> = io.open(soutput .. ".h", "w")
+if format == ".c" then
     local process = require("wf.api.v1.process")
     local wfbin2c = require("wf.internal.bin2c")
-    local bin2c_entries = tablex.deepcopy(result)
-    for entry_key, entry in pairs(bin2c_entries) do
-        entry = process.to_data(entry)
-        for k, v in pairs(default_bin2c_args) do
-            if entry[k] == nil then
-                entry[k] = v
+    local all_bin2c_entries = {}
+
+    -- Emit header files.
+    for k, v in pairs(_WFPROCESS.bin2c) do
+        local h_file <close> = io.open(path.join(ocwd, k), "w")
+
+        local bin2c_entries = tablex.deepcopy(v)
+        for entry_key, entry in pairs(bin2c_entries) do
+            entry = process.to_data(entry)
+            for k, v in pairs(default_bin2c_args) do
+                if entry[k] == nil then
+                    entry[k] = v
+                end
             end
+            bin2c_entries[entry_key] = entry
+            all_bin2c_entries[entry_key] = entry
         end
-        bin2c_entries[entry_key] = entry
+
+        wfbin2c.bin2c(nil, h_file, "wf-process", bin2c_entries)
     end
-    wfbin2c.bin2c(c_file, h_file, "wf-process", bin2c_entries)
-else
-    error("unsupported format: " .. format)
+
+    local c_file <close> = io.open(soutput .. ".c", "w")
+    wfbin2c.bin2c(c_file, nil, "wf-process", all_bin2c_entries)
 end
 
 -- Emit dependency file.

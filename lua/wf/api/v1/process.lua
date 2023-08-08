@@ -24,16 +24,6 @@ function M.tmpfile(ext)
     return {["file"]=_WFPROCESS.temp_dir:path(string.format("wf%05d%s", tmpfile_counter, ext or ""))}
 end
 
---- Create a symbol from a string or file table. Error if not possible.
-function M.symbol(obj, prefix)
-    local filename = M.filename(obj)
-    if filename == nil then
-        error("could not determine filename for symbol")
-    end
-    local basename = path.splitext(path.basename(filename))
-    return (prefix or "") .. wfutil.to_c_identifier(basename)
-end
-
 --- Retrieve a filename from a string or file table.
 function M.filename(obj)
     if type(obj) == "table" then
@@ -88,6 +78,53 @@ end
 -- @tparam string mode File access mode, as in Lua's "io" package.
 function M.touch(name, mode)
     _WFPROCESS.access_file(M.filename(name), mode)
+end
+
+--- Create a symbol name from a string or file table. Error if not possible.
+function M.symbol(obj)
+    local filename = M.filename(obj)
+    if filename == nil then
+        error("could not determine filename for symbol")
+    end
+    local basename = path.splitext(path.basename(filename))
+    return wfutil.to_c_identifier(basename)
+end
+
+--- Emit a symbol.
+function M.emit_symbol(name, data)
+    if type(name) ~= "string" then
+        name = _WFPROCESS.bin2c_default_prefix .. M.symbol(name)
+    end
+
+    if type(data) == "table" then
+        local has_non_data = false
+        for k,v in pairs(data) do
+            if k ~= "data" and k ~= "file" then
+                has_non_data = true
+                break
+            end
+        end
+        if data.data ~= nil and (not has_non_data) then
+            data = data.data
+        elseif data.file ~= nil and (not has_non_data) then
+            data = M.to_data(data).data
+        else
+            for k, v in pairs(data) do
+                M.emit_symbol(name .. "_" .. k, v)
+            end
+            return
+        end
+    end
+
+    if _WFPROCESS.bin2c == nil then
+        error("emit_symbol not supported by current configuration")
+    end
+    
+    local header_name = _WFPROCESS.bin2c_default_header
+    if _WFPROCESS.bin2c[header_name] == nil then
+        _WFPROCESS.bin2c[header_name] = {}
+    end
+    _WFPROCESS.bin2c[header_name][name] = data
 end
 
 return M
