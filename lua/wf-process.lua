@@ -156,10 +156,12 @@ if format == ".c" then
 end
 
 local applicable_files = nil
-senv.files = function(...)
+_WFPROCESS.files = function(...)
     local exts = {...}
 
     if applicable_files == nil then
+        local process = require("wf.api.v1.process")
+
         -- List all files, split into Lua (dictionary) and non-Lua (array) files
         local lua_files = {}
         local asset_files = {}
@@ -172,7 +174,7 @@ senv.files = function(...)
                 if asset_files[filebase] == nil then
                     asset_files[filebase] = {}
                 end
-                table.insert(asset_files[filebase], {["file"]=filename})
+                table.insert(asset_files[filebase], process.File(filename))
             end
         end
 
