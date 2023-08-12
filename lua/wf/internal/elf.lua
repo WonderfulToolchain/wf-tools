@@ -5,7 +5,6 @@
 -- @module wf.internal.elf
 -- @alias M
 
-local vstruct = require("vstruct")
 local M = {}
 
 M.ELF_MAGIC = string.char(127) .. "ELF"
