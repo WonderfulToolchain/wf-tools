@@ -18,6 +18,7 @@ M.ET_EXEC = 2
 M.ET_DYN = 3
 M.ET_CORE = 4
 M.EM_NONE = 0
+M.EM_386 = 3
 M.EM_MIPS = 8
 M.SHN_UNDEF = 0
 M.SHN_ABS = 0xFFF1
@@ -50,6 +51,12 @@ M.SHF_OS_NONCONFORMING = 0x00000100
 M.SHF_GROUP            = 0x00000200
 M.SHF_TLS              = 0x00000400
 M.SHF_EXCLUDE          = 0x80000000
+M.STT_NOTYPE = 0
+M.STT_OBJECT = 1
+M.STT_FUNC = 2
+M.STT_SECTION = 3
+M.STT_FILE = 4
+M.STT_COMMON = 5
 M.GRP_COMDAT = 1
 M.PT_NULL = 0
 M.PT_LOAD = 1
@@ -59,6 +66,14 @@ M.PT_NOTE = 4
 M.PT_SHLIB = 5
 M.PT_PHDR = 6
 M.PT_TLS = 7
+M.R_386_NONE = 0
+M.R_386_16 = 20
+M.R_386_SEG16 = 45
+M.R_386_SUB16 = 46
+M.R_386_SUB32 = 47
+M.R_386_SEGRELATIVE = 48
+M.R_386_OZSEG16 = 80
+M.R_386_OZRELSEG16 = 81
 
 local function get_e_w(header)
     local e, w
@@ -77,6 +92,23 @@ local function get_e_w(header)
         error("invalid elf endianness: " .. header.endianness)
     end
     return e, w
+end
+
+function M.read_string(file, section, offset)
+    file:seek("set", section.offset + offset)
+    local s = ""
+    while true do
+        local cs = file:read(1)
+        if cs == nil then
+            return s
+        end
+        local c = string.byte(cs)
+        if c == 0 then
+            return s
+        else
+            s = s .. string.char(c)
+        end
+    end
 end
 
 --- Read ELF file header.

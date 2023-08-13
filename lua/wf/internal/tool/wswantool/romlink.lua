@@ -170,7 +170,7 @@ end
 
 return {
     ["arguments"] = [[
-[args...] -- <linker args...>: assemble a wswan target ROM
+[args...] -- <linker args...>: (DEPRECATED) assemble a wswan target ROM
   -c,--config   (optional string)  Configuration file name;
                                    wfconfig.toml is used by default.
   -o,--output   (string)           Output ROM file name.
@@ -181,6 +181,6 @@ return {
   -v,--verbose                     Enable verbose logging.
 ]],
     ["argument_separator"] = "--",
-    ["description"] = "assemble a wswan target ROM",
+    ["description"] = "(DEPRECATED) assemble a wswan target ROM",
     ["run"] = romlink_run
 }

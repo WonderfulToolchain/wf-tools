@@ -369,6 +369,8 @@ f:write([[
 end
 
 commands = {}
+commands.build = {}
+commands.build.rom = require('wf.internal.tool.wswantool.elf2rom.main')
 commands.project = require('wf.internal.tool.project')('wswan')
 commands.romlink = require('wf.internal.tool.wswantool.romlink')
 

@@ -62,6 +62,7 @@ end
 -- @tparam string|table|number ... Checksum component.
 -- @treturn number The calculated checksum.
 function M.calculate_rom_checksum(...)
+    local arg = {...}
     local checksum = 0
     local bytes_read = 0
     for i, value in ipairs(arg) do
