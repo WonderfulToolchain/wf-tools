@@ -34,7 +34,7 @@ local function entry_plus_offset(entry, offset)
     if entry.type == 2 then
         -- linear banks
         return ((entry.bank & 0xF) << 16) + offset
-    elseif (entry.type == 0) or (entry.type == 3) then
+    elseif (entry.type == 0) or (entry.type == -1) then
         -- bank 0
         return 0x20000 + offset
     elseif entry.type == 1 then
@@ -68,7 +68,12 @@ end
 local function get_linear_logical_address(symbol, offset)
     offset = offset or 0
     local linear = get_linear_address(symbol)
-    return linear, (linear >> 4), offset + (linear & 0xF)
+    if symbol[1] ~= nil and (symbol[1].type == 2 or symbol[1].type == -1) then
+        return linear + offset, (linear >> 4), offset + (linear & 0xF)
+    else
+        linear = linear + offset
+        return linear, (linear & 0xF0000) >> 4, (linear & 0xFFFF)
+    end
 end
 
 local function relocate16le(data, offset, f)
@@ -148,14 +153,24 @@ local function apply_section_name_to_entry(entry)
             end
         elseif stype == wfallocator.IRAM then
             if #parts >= 2 then
-                entry.offset = tonumber(parts[2], 16)
+                if parts[2] == "tile" then
+                    entry.offset = 0x2000
+                elseif parts[2] == "tile4bpp" then
+                    entry.offset = 0x4000
+                else
+                    entry.offset = tonumber(parts[2], 16)
+                end
             end
         end
         entry.type = stype
+        return true
+    else
+        return false
     end
 end
 
 local function romlink_run(args, linker_args)
+    local gc_enabled = not args.disable_gc
     local config = toml.decodeFromFile(args.config or "wfconfig.toml")
     local allocator = wfallocator.Allocator()
     -- TODO: Valid iram_size/sram_size values.
@@ -196,6 +211,8 @@ local function romlink_run(args, linker_args)
     local shstrtab = elf.shdr[elf.shstrndx + 1]
     local strtab, symtab
 
+    local retained_sections = {}
+
     for i=1,#elf.shdr do
         local shdr = elf.shdr[i]
         if shdr.type == wfelf.SHT_SYMTAB then
@@ -214,30 +231,36 @@ local function romlink_run(args, linker_args)
             end
             if data ~= nil then
                 local section_entry = {
+                    ["input_index"] = i - 1,
                     ["name"] = clean_section_name(section_name),
                     ["data"] = data
                 }
-                apply_section_name_to_entry(section_entry)
                 if shdr.addralign >= 1 then
                     section_entry.align = shdr.addralign
-                else
-                    -- TODO
+                elseif #data >= 2 then
                     section_entry.align = 2
                 end
-                if stringx.startswith(section_name, ".fartext")
-                or section_name == ".start"
-                or stringx.startswith(section_name, ".farrodata") then
-                    section_entry.type = 2
-                    section_entry.bank = 0xFFF
+                if not apply_section_name_to_entry(section_entry) then
+                    if stringx.startswith(section_name, ".fartext")
+                    or section_name == ".text"
+                    or section_name == ".start"
+                    or stringx.startswith(section_name, ".farrodata") then
+                        section_entry.type = 2
+                        section_entry.bank = 0xFFF
+                    else
+                        section_entry.type = wfallocator.IRAM
+                    end
+                    if (shdr.flags & wfelf.SHF_GNU_RETAIN) ~= 0 then
+                        retained_sections[section_entry.input_index] = true
+                    end
                 else
-                    section_entry.type = wfallocator.IRAM
+                    retained_sections[section_entry.input_index] = true
                 end
                 if #data > 0xFFF0 then
-                    data.align = 16
+                    section_entry.align = 16
                 end
                 sections_by_name[section_entry.name] = section_entry
                 sections[i] = section_entry
-                allocator:add(section_entry)
             end
         end
     end
@@ -252,11 +275,10 @@ local function romlink_run(args, linker_args)
             end
         end
     end
-    allocator:allocate(allocator_config, false)
 
     -- Parse symbol table.
     local symbols = {}
-    local symbols_by_name = {}
+    local symbols_by_name = {} 
     local symtab_count = symtab.size / symtab.entsize
     for i=1,symtab_count do
         local sym = {}
@@ -278,11 +300,102 @@ local function romlink_run(args, linker_args)
             symbols_by_name[symbol_name] = symbol_entry
         end
     end
-    
+
+    -- Parse relocation table.
+    local relocations = {}
+
+    for i=1,#elf.shdr do
+        local shdr = elf.shdr[i]
+        if shdr.type == wfelf.SHT_REL then
+            local target_section = sections[shdr.info + 1]
+            if target_section == nil then
+                error("could not find target for relocation section " .. wfelf.read_string(elf_file, shstrtab, elf.shdr[i].name))
+            end
+            local count = shdr.size / shdr.entsize
+            for i=1,count do
+                elf_file:seek("set", shdr.offset + ((i - 1) * shdr.entsize))
+                local r_offset, r_type, r_sym = string.unpack(
+                    "<I4BI3", elf_file:read(shdr.entsize)
+                )
+                local symbol = symbols[r_sym + 1]
+                table.insert(relocations, {
+                    ["offset"] = r_offset,
+                    ["type"] = r_type,
+                    ["section"] = target_section,
+                    ["symbol"] = symbol
+                })
+            end
+        elseif shdr.type == wfelf.SHT_RELA then
+            error("'rela' relocation sections not implemented")
+        end
+    end
+
     local start_symbol = symbols_by_name["_start"]
     if start_symbol == nil then
         error("could not find symbol: _start")
     end
+    retained_sections[start_symbol[1].input_index] = true
+    
+    if gc_enabled then
+        -- Perform garbage collection by using relocation tables as a section usage map.
+        local section_children = {} -- section: {sections...}
+
+        for i, relocation in pairs(relocations) do
+            local r_offset = relocation.offset
+            local r_type = relocation.type
+            local target_section = relocation.section
+            local symbol = relocation.symbol
+            
+            if relocation.symbol[1] ~= nil then
+                -- the symbol in this section...
+                local child_id = relocation.symbol[1].input_index
+                -- ... is relocated in this section.
+                local parent_id = relocation.section.input_index
+                if parent_id ~= nil and child_id ~= nil then
+                    if section_children[parent_id] == nil then
+                        section_children[parent_id] = {}
+                    end
+                    section_children[parent_id][child_id] = true
+                end
+            end
+        end
+
+        local new_retained_sections = retained_sections
+        retained_sections = {}
+        while next(new_retained_sections) ~= nil do
+            local next_retained_sections = {}
+            for i,v in pairs(new_retained_sections) do
+                retained_sections[i] = true
+            end
+            for i,v in pairs(new_retained_sections) do
+                if section_children[i] ~= nil then
+                    for i2,v2 in pairs(section_children[i]) do
+                        if retained_sections[i2] ~= true then
+                            next_retained_sections[i2] = true
+                        end
+                    end
+                end
+            end
+            new_retained_sections = next_retained_sections
+        end
+
+        for i, v in pairs(sections) do
+            if #v.data > 0 and v.input_index == i - 1 then
+                if retained_sections[v.input_index] then
+                    allocator:add(v)
+                    print("keeping " .. v.name)
+                else
+                    print("garbage collecting " .. v.name)
+                end
+            end
+        end
+    else
+        for i, v in pairs(sections) do
+            allocator:add(v)
+        end
+    end
+
+    allocator:allocate(allocator_config, false)
 
     -- At this point, we know how big the IRAM allocation is. Copy it to ROM and emit required symbols.
     -- TODO: Implement .bss
@@ -310,57 +423,47 @@ local function romlink_run(args, linker_args)
     emit_symbol(symbols_by_name, "__lwbss", 1)
 
     -- Apply relocations.
-    for i=1,#elf.shdr do
-        local shdr = elf.shdr[i]
-        if shdr.type == wfelf.SHT_REL then
-            local target_section = sections[shdr.info + 1]
-            if target_section == nil then
-                error("could not find target for relocation section " .. wfelf.read_string(elf_file, shstrtab, elf.shdr[i].name))
-            end
-            local count = shdr.size / shdr.entsize
-            for i=1,count do
-                elf_file:seek("set", shdr.offset + ((i - 1) * shdr.entsize))
-                local r_offset, r_type, r_sym = string.unpack(
-                    "<I4BI3", elf_file:read(shdr.entsize)
-                )
-                local symbol = symbols[r_sym + 1]
-                if symbol[2].shndx == wfelf.SHN_UNDEF then
-                    -- We may have added the symbol to symbols_by_name manually.
-                    symbol = symbols_by_name[symbol[3]]
-                    if symbol == nil or symbol[2].shndx == wfelf.SHN_UNDEF then
-                        if stringx.startswith(symbol[3], "__bank_") then
-                            -- __bank handling: Dynamically create a faux-symbol.
-                            local key = symbol[3]:sub(8)
-                            symbol = symbols_by_name[key]
-                            if symbol == nil or symbol[1] == nil then
-                                error("could not locate symbol: " .. symbol[3])
-                            end
-                            symbol = {nil, symbol[1].bank or 0, key}
-                            symbols_by_name[key] = symbol
-                        else
-                            error("could not locate symbol: " .. symbol[3])
-                        end
+    for i, relocation in pairs(relocations) do
+        local r_offset = relocation.offset
+        local r_type = relocation.type
+        local target_section = relocation.section
+        local symbol = relocation.symbol
+        if symbol[2].shndx == wfelf.SHN_UNDEF then
+            -- We may have added the symbol to symbols_by_name manually.
+            symbol = symbols_by_name[symbol[3]]
+            if symbol == nil or symbol[2].shndx == wfelf.SHN_UNDEF then
+                if stringx.startswith(symbol[3], "__bank_") then
+                    -- __bank handling: Dynamically create a faux-symbol.
+                    local key = symbol[3]:sub(8)
+                    symbol = symbols_by_name[key]
+                    if symbol == nil or symbol[1] == nil then
+                        error("could not locate symbol: " .. symbol[3])
                     end
-                end
-                local linear, segment, offset = get_linear_logical_address(symbol)
-                local value = linear
-                if stringx.endswith(symbol[3], "!") then
-                    value = segment << 4
-                end
-                if r_type == wfelf.R_386_16 then
-                    target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v + value end)
-                elseif r_type == wfelf.R_386_SUB16 then
-                    target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v - value end)
-                elseif r_type == wfelf.R_386_SEG16 then
-                    target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return ((v << 4) + value) >> 4 end)
-                elseif r_type == wfelf.R_386_OZSEG16 then
-                    target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v + segment end)
+                    symbol = {nil, symbol[1].bank or 0, key}
+                    symbols_by_name[key] = symbol
                 else
-                    error("unsupported relocation type " .. r_type)
+                    error("could not locate symbol: " .. symbol[3])
                 end
             end
-        elseif shdr.type == wfelf.SHT_RELA then
-            error("'rela' relocation sections not implemented")
+        end
+
+        local linear, segment, offset = get_linear_logical_address(symbol)
+        if r_type == wfelf.R_386_OZSEG16 then
+            target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v + segment end)
+        else
+            local value = linear
+            if stringx.endswith(symbol[3], "!") then
+                value = segment << 4
+            end
+            if r_type == wfelf.R_386_16 then
+                target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v + value end)
+            elseif r_type == wfelf.R_386_SUB16 then
+                target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v - value end)
+            elseif r_type == wfelf.R_386_SEG16 then
+                target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return ((v << 4) + value) >> 4 end)
+            else
+                error("unsupported relocation type " .. r_type)
+            end
         end
     end
 
@@ -411,10 +514,20 @@ local function romlink_run(args, linker_args)
     for i, bank in pairs(allocator.banks[0]) do
         for j, entry in pairs(bank.entries) do
             local offset = ((entry.bank - rom_bank_first) * 0x10000 + entry.offset) - min_position
-            print(entry.bank .. " " .. offset .. " " .. #entry.data .. " " .. entry.offset)
             rom_file:seek("set", offset)
             rom_file:write(entry.data)
         end
+    end
+
+    for i, bank in pairs(allocator.banks[wfallocator.IRAM]) do
+        for j, entry in pairs(bank.entries) do
+            print((entry.name or "") .. " " .. entry.bank .. " " .. entry.offset)
+        end
+    end
+
+    -- Build relocated ELF.
+    if args.output_elf ~= nil then
+        -- TODO
     end
 end
 
@@ -425,6 +538,7 @@ return {
                                    wfconfig.toml is used by default.
   -o,--output   (string)           Output ROM file name.
   --output-elf  (optional string)  Output ELF file name; stored on request.
+  --disable-gc                     Disable section garbage collection.
   --trim                           Trim the assembled ROM by removing unused
                                    space from the beginning of the file.
   -v,--verbose                     Enable verbose logging.
