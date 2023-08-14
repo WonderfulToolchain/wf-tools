@@ -14,6 +14,9 @@ local wswan = require('wf.internal.platform.wswan')
 
 local wfallocator = require('wf.internal.tool.wswantool.elf2rom.allocator')
 
+local EMPTY_YES = 1
+local EMPTY_DONTCARE = 2
+
 local function romlink_calc_rom_size(rom_bank_count)
     local rom_size_id, rom_size_value
     for k, v in pairs(wswan.ROM_BANK_COUNT_TO_HEADER_SIZE) do
@@ -68,7 +71,7 @@ end
 local function get_linear_logical_address(symbol, offset)
     offset = offset or 0
     local linear = get_linear_address(symbol)
-    if symbol[1] ~= nil and (symbol[1].type == 2 or symbol[1].type == -1) then
+    if symbol[1] == nil or (symbol[1].type == 2 or symbol[1].type == -1) then
         return linear + offset, (linear >> 4), offset + (linear & 0xF)
     else
         linear = linear + offset
@@ -121,8 +124,12 @@ end
 
 local function apply_section_name_to_entry(entry)
     local stype = nil
+    local sempty = nil
     if entry.name:find("^.iram[_.]") then
         stype = wfallocator.IRAM
+    elseif entry.name:find("^.iramx[_.]") then
+        stype = wfallocator.IRAM
+        sempty = EMPTY_DONTCARE
     elseif entry.name:find("^.sram[_.]") then
         stype = wfallocator.SRAM
     elseif entry.name:find("^.rom[01L][_.]") then
@@ -153,20 +160,74 @@ local function apply_section_name_to_entry(entry)
             end
         elseif stype == wfallocator.IRAM then
             if #parts >= 2 then
-                if parts[2] == "tile" then
-                    entry.offset = 0x2000
-                elseif parts[2] == "tile4bpp" then
-                    entry.offset = 0x4000
-                else
-                    entry.offset = tonumber(parts[2], 16)
-                end
+                entry.offset = tonumber(parts[2], 16)
             end
         end
         entry.type = stype
+        if sempty ~= nil then entry.empty = sempty end
         return true
     else
         return false
     end
+end
+
+local function is_string_empty(s)
+    for i=1,#s do
+        if string.byte(s, i) ~= 0 then
+            return false
+        end
+    end
+    return true
+end
+
+-- At this point, we know how big the IRAM allocation is. Copy it to ROM and emit required symbols.
+-- Format:
+-- - length: 2 bytes
+-- - offset: 2 bytes
+-- - flags: 2 bytes
+--   - 0x8000: followed by data if true, not followed by data if false
+-- Cap size at 65520 bytes.
+local function build_iram_data_push(data, joined_entry)
+    if joined_entry == nil then return end
+
+    local length = #joined_entry.data
+    local offset = joined_entry.offset
+    local flags = 0
+    if joined_entry.empty then flags = flags | 0x8000 end
+
+    data = data .. string.char(length & 0xFF) .. string.char((length >> 8) & 0xFF)
+    data = data .. string.char(offset & 0xFF) .. string.char((offset >> 8) & 0xFF)
+    data = data .. string.char(flags & 0xFF) .. string.char((flags >> 8) & 0xFF)
+    if not joined_entry.empty then data = data .. joined_entry.data end
+    return data
+end
+
+local function build_iram_data(iram)
+    local data = ""
+    local joined_entry = nil
+
+    for i, v in pairs(iram.entries) do
+        if #v.data > 0 and v.empty ~= EMPTY_DONTCARE then
+            if joined_entry == nil then
+                joined_entry = tablex.copy(v)
+            else
+                local je_end_offset = joined_entry.offset + #joined_entry.data
+                if v.offset == je_end_offset and (v.empty == true) == (joined_entry.empty == true) then
+                    joined_entry.data = joined_entry.data .. v.data
+                else
+                    data = build_iram_data_push(data, joined_entry)
+                    joined_entry = tablex.copy(v)
+                end
+            end
+        end
+    end
+
+    data = build_iram_data_push(data, joined_entry)
+    data = data .. string.char(0) .. string.char(0)
+    if #data > 65520 then
+        error("IRAM data block too large")
+    end
+    return data
 end
 
 local function romlink_run(args, linker_args)
@@ -195,7 +256,8 @@ local function romlink_run(args, linker_args)
     local irq_vectors = {
         ["type"] = wfallocator.IRAM,
         ["offset"] = 0x0000,
-        ["data"] = string.char(0):rep(64)
+        ["data"] = string.char(0):rep(64),
+        ["empty"] = EMPTY_DONTCARE
     }
     allocator:add(irq_vectors)
 
@@ -221,11 +283,16 @@ local function romlink_run(args, linker_args)
         elseif ((shdr.flags & wfelf.SHF_ALLOC) ~= 0) and (shdr.size > 0) then
             local section_name = wfelf.read_string(elf_file, shstrtab, shdr.name)
             local data
+            local data_empty = 0
             if shdr.type == wfelf.SHT_PROGBITS then
                 elf_file:seek("set", shdr.offset)
                 data = elf_file:read(shdr.size)
+                if is_string_empty(data) then
+                    data_empty = EMPTY_YES
+                end
             elseif shdr.type == wfelf.SHT_NOBITS then
                 data = string.char(0):rep(shdr.size)
+                data_empty = EMPTY_YES
             else
                 data = nil
             end
@@ -233,7 +300,8 @@ local function romlink_run(args, linker_args)
                 local section_entry = {
                     ["input_index"] = i - 1,
                     ["name"] = clean_section_name(section_name),
-                    ["data"] = data
+                    ["data"] = data,
+                    ["empty"] = data_empty
                 }
                 if shdr.addralign >= 1 then
                     section_entry.align = shdr.addralign
@@ -383,9 +451,8 @@ local function romlink_run(args, linker_args)
             if #v.data > 0 and v.input_index == i - 1 then
                 if retained_sections[v.input_index] then
                     allocator:add(v)
-                    print("keeping " .. v.name)
                 else
-                    print("garbage collecting " .. v.name)
+                    print("Removing section (GC): " .. v.name)
                 end
             end
         end
@@ -397,30 +464,21 @@ local function romlink_run(args, linker_args)
 
     allocator:allocate(allocator_config, false)
 
-    -- At this point, we know how big the IRAM allocation is. Copy it to ROM and emit required symbols.
-    -- TODO: Implement .bss
     local iram = allocator.banks[wfallocator.IRAM][1]
-    local iram_start = iram:allocation_start()
-    local iram_length = ((iram:allocation_end() - iram_start + 1) + 1) & 0xFFFE
     local iram_entry = {
         ["name"] = "(wf) ROM -> IRAM copy",
-        ["data"] = string.char(0):rep(iram_length),
         ["type"] = 2,
         ["bank"] = 0xFFF,
         ["align"] = 2
     }
+    iram_entry.data = build_iram_data(iram)
     allocator:add(iram_entry)
     allocator:allocate(allocator_config, false)
 
     local heap_start, heap_length = iram:largest_gap()
-    emit_symbol(symbols_by_name, "__sheap", heap_start)
-    emit_symbol(symbols_by_name, "__eheap", heap_start + heap_length)
-    emit_symbol(symbols_by_name, "__erom", entry_plus_offset(iram_entry, 0), entry_plus_offset(iram_entry, 0) & 0xFFFF0)
-    emit_symbol(symbols_by_name, "__sdata", iram_start)
-    emit_symbol(symbols_by_name, "__ldata", iram_length)
-    emit_symbol(symbols_by_name, "__lwdata", iram_length >> 1)
-    emit_symbol(symbols_by_name, "__edata", 0)
-    emit_symbol(symbols_by_name, "__lwbss", 1)
+    emit_symbol(symbols_by_name, "__wf_heap_start", heap_start)
+    emit_symbol(symbols_by_name, "__wf_heap_top", heap_start + heap_length)
+    emit_symbol(symbols_by_name, "__wf_data_block", entry_plus_offset(iram_entry, 0), entry_plus_offset(iram_entry, 0) & 0xFFFF0)
 
     -- Apply relocations.
     for i, relocation in pairs(relocations) do
@@ -468,10 +526,14 @@ local function romlink_run(args, linker_args)
     end
 
     -- Copy IRAM data to ROM.
-    for j, entry in pairs(iram.entries) do
-        local offset = entry.offset - iram_start + 1
-        local length = #entry.data
-        iram_entry.data = iram_entry.data:sub(1, offset - 1) .. entry.data .. iram_entry.data:sub(offset + length)
+    iram_entry.data = build_iram_data(iram)
+    -- Check if no data is attmepted to be written in SRAM.
+    for i, bank in pairs(allocator.banks[wfallocator.SRAM]) do
+        for j, entry in pairs(bank.entries) do
+            if not entry.empty then
+                error("unsupported: symbol " .. (entry.name or "???") .. " in SRAM contains data")
+            end
+        end
     end
 
     local linear, segment, offset = get_linear_logical_address(start_symbol)
@@ -531,13 +593,15 @@ local function romlink_run(args, linker_args)
     end
 end
 
+-- TODO:
+-- --output-elf  (optional string)  Output ELF file name; stored on request.
+
 return {
     ["arguments"] = [[
 [args...] <input>: convert an ELF file to a wswan ROM
   -c,--config   (optional string)  Configuration file name;
                                    wfconfig.toml is used by default.
   -o,--output   (string)           Output ROM file name.
-  --output-elf  (optional string)  Output ELF file name; stored on request.
   --disable-gc                     Disable section garbage collection.
   --trim                           Trim the assembled ROM by removing unused
                                    space from the beginning of the file.
