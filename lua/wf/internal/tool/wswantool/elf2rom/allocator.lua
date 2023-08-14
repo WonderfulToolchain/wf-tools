@@ -263,7 +263,11 @@ local function try_place_entry_inner(banks, entry)
     local limit = nil
     if entry.type then
         if entry.type == 2 then
-            limit = 16 - (entry.bank & 0x0F)
+            if bank.descending then
+                limit = ((entry.bank & 0x0F) - 4) + 1
+            else
+                limit = (15 - (entry.bank & 0x0F)) + 1
+            end
         elseif entry.type == -1 then
             limit = 2
         else
@@ -271,8 +275,99 @@ local function try_place_entry_inner(banks, entry)
         end
     end
 
-    -- TODO: Implement splitting across multiple banks
-    return false    
+    if limit == nil or limit > 1 then
+        -- Split across multiple banks.
+
+        local start_bank = entry.bank
+        local end_bank = entry.bank
+        local start_offset = 0
+        local end_offset = bank.size - 1
+        if bank.descending then
+            end_offset = banks[end_bank]:allocation_start()
+            local next_start_bank = entry.bank
+            for i=start_bank-1,start_bank-(limit-1),-1 do
+                next_start_bank = i
+                if not banks[i]:is_empty() then
+                    start_offset = banks[i]:allocation_end() + 1
+                    break
+                end
+            end
+            start_bank = next_start_bank
+        else
+            start_offset = banks[start_bank]:allocation_end() + 1
+            local next_end_bank = entry.bank
+            for i=start_bank+1,start_bank+(limit-1),-1 do
+                next_end_bank = i
+                if not banks[i]:is_empty() then
+                    end_offset = banks[i]:allocation_start()
+                    break
+                end
+            end
+            end_bank = next_end_bank
+        end
+        if start_offset == bank.size then
+            start_bank = start_bank + 1
+            start_offset = 0
+        end
+
+        local joined_linear_start = (start_bank * bank.size + start_offset)
+        local joined_linear_end = (end_bank * bank.size + end_offset)
+        local joined_size = joined_linear_end - joined_linear_start
+        if joined_size < #entry.data then
+            return false
+        end
+
+        joined_linear_start = calc_eoffset(joined_linear_start, joined_linear_end, #entry.data, bank.descending, entry.align)
+        joined_linear_end = joined_linear_start + #entry.data
+        local joined_start_bank = joined_linear_start // bank.size
+        local joined_start_offset = joined_linear_start % bank.size
+        local joined_end_bank = (joined_linear_end - 1) // bank.size
+        local joined_end_offset = (joined_linear_end - 1) % bank.size
+        local bank_count = joined_end_bank + 1 - joined_start_bank
+
+        if limit and bank_count > limit then
+            return false
+        end
+
+        -- Split entry across multiple banks (simulation).
+        -- TODO: Doing the :sub twice is probably a little slow, but cross-bank
+        -- splitting should be rare.
+        local sentry = tablex.deepcopy(entry)
+        sentry.bank = joined_start_bank
+        sentry.offset = joined_start_offset
+        local pos = 1
+        for i = 1,bank_count do
+            sentry.data = entry.data:sub(pos, pos + bank.size - 1 - sentry.offset)
+            if not banks[sentry.bank]:try_place(sentry, true) then
+                return false
+            end
+            pos = pos + bank.size - sentry.offset
+            sentry.bank = sentry.bank + 1
+            sentry.offset = 0
+        end
+
+        -- Split entry across multiple banks (real placement).
+        entry.bank = joined_start_bank
+        entry.offset = joined_start_offset
+        pos = 1
+        local sentry = tablex.deepcopy(entry)
+        for i = 1,bank_count do
+            sentry.parent = entry
+            sentry.parent_offset = pos - 1
+            sentry.data = entry.data:sub(pos, pos + bank.size - 1 - sentry.offset)
+            if not banks[sentry.bank]:try_place(sentry, false) then
+                error("unexpected disagreement between simulation and real bank placement attempt")
+            end
+            if i ~= bank_count then
+                pos = pos + bank.size - sentry.offset
+                sentry = tablex.deepcopy(sentry)
+                sentry.bank = sentry.bank + 1
+                sentry.offset = 0
+            end
+        end
+
+        return true
+    end
 end
 
 local function try_place_entry(banks, entry)
@@ -329,7 +424,16 @@ local function calculate_bank_sizes(banks)
     end
 end
 
-function Allocator:allocate(config)
+local function copy_from_parent(entry)
+    if entry.parent ~= nil and entry.parent_offset ~= nil then
+        if entry.parent.parent ~= nil then
+            copy_from_parent(entry.parent)
+        end
+        entry.data = entry.parent.data:sub(entry.parent_offset + 1, entry.parent_offset + #entry.data)
+    end
+end
+
+function Allocator:allocate(config, is_final)
     local banks = self.banks
     if banks == nil then
         banks = {}
@@ -395,6 +499,15 @@ function Allocator:allocate(config)
     self.bank_sizes = {}
     for i, v in pairs(self.banks) do
         self.bank_sizes[i] = calculate_bank_sizes(self.banks[i])
+    end
+    if is_final then
+        for i, v in pairs(self.banks) do
+            for j, bank in pairs(v) do
+                for k, entry in pairs(bank.entries) do
+                    copy_from_parent(entry)
+                end
+            end
+        end
     end
 end
 

@@ -252,7 +252,7 @@ local function romlink_run(args, linker_args)
             end
         end
     end
-    allocator:allocate(allocator_config)
+    allocator:allocate(allocator_config, false)
 
     -- Parse symbol table.
     local symbols = {}
@@ -297,7 +297,7 @@ local function romlink_run(args, linker_args)
         ["align"] = 2
     }
     allocator:add(iram_entry)
-    allocator:allocate(allocator_config)
+    allocator:allocate(allocator_config, false)
 
     local heap_start, heap_length = iram:largest_gap()
     emit_symbol(symbols_by_name, "__sheap", heap_start)
@@ -376,7 +376,7 @@ local function romlink_run(args, linker_args)
     config.cartridge.start_offset = offset
 
     -- Final ROM allocation, calculate size.
-    allocator:allocate(allocator_config)
+    allocator:allocate(allocator_config, true)
     local allocated_rom_bank_count = allocator.bank_sizes[0].count
     local allocated_rom_bank_offset = allocator.banks[0][allocator.bank_sizes[0].first]:allocation_start()
     local rom_bank_type, rom_bank_count = romlink_calc_rom_size(config.cartridge.rom_banks or allocator.bank_sizes[0].count)
