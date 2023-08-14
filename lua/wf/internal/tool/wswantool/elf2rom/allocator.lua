@@ -473,7 +473,8 @@ function Allocator:allocate(config, is_final)
     -- Third, consider offset: present comes before non-present
     -- (We don't need to consider this, as fixed entries are processed early.)
     -- Fourth, consider alignment: present comes before non-present
-    -- Fifth, consider size: largest comes before smallest
+    -- Fifth, consider emptiness: non-empty comes before empty
+    -- Sixth, consider size: largest comes before smallest
 
     table.sort(self.entries, function(a, b)
         if a.type > b.type then return true end
@@ -484,6 +485,8 @@ function Allocator:allocate(config, is_final)
         if a.offset == nil and b.offset ~= nil then return false end
         if a.align ~= nil and b.align == nil then return true end
         if a.align == nil and b.align ~= nil then return false end
+        if not a.empty and b.empty then return true end
+        if a.empty and not b.empty then return false end
         return #a.data > #b.data
     end)
 

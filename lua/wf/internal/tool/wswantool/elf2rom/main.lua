@@ -86,7 +86,14 @@ local function relocate16le(data, offset, f)
     return data:sub(1, offset - 1) .. string.char(spot & 0xFF) .. string.char((spot >> 8) & 0xFF) .. data:sub(offset + 2)
 end
 
-local function emit_symbol(symbols_by_name, name, value, segment)
+local function relocate32le(data, offset, f)
+    local spot = (data:byte(offset) & 0xFF) | ((data:byte(offset + 1) & 0xFF) << 8) | ((data:byte(offset + 2) & 0xFF) << 16) | ((data:byte(offset + 3) & 0xFF) << 24)
+    spot = f(spot)
+    -- TODO: This is slow :(
+    return data:sub(1, offset - 1) .. string.char(spot & 0xFF) .. string.char((spot >> 8) & 0xFF) .. string.char((spot >> 16) & 0xFF) .. string.char((spot >> 24) & 0xFF) .. data:sub(offset + 4)
+end
+
+local function emit_raw_symbol(symbols_by_name, name, value)
     symbols_by_name[name] = {
         nil,
         {
@@ -98,28 +105,12 @@ local function emit_symbol(symbols_by_name, name, value, segment)
         },
         name
     }
-    symbols_by_name[name .. "!"] = {
-        nil,
-        {
-            ["value"] = segment or 0,
-            ["size"] = 0,
-            ["info"] = wfelf.STT_NOTYPE,
-            ["other"] = 0,
-            ["shndx"] = wfelf.SHN_ABS
-        },
-        name .. "!"
-    }
-    symbols_by_name[name .. "&"] = {
-        nil,
-        {
-            ["value"] = value,
-            ["size"] = 0,
-            ["info"] = wfelf.STT_NOTYPE,
-            ["other"] = 0,
-            ["shndx"] = wfelf.SHN_ABS
-        },
-        name .. "&"
-    }
+end
+
+local function emit_symbol(symbols_by_name, name, value, segment)
+    emit_raw_symbol(symbols_by_name, name, value)
+    emit_raw_symbol(symbols_by_name, name .. "!", segment or 0)
+    emit_raw_symbol(symbols_by_name, name .. "&", value)
 end
 
 local function apply_section_name_to_entry(entry)
@@ -280,7 +271,7 @@ local function romlink_run(args, linker_args)
         if shdr.type == wfelf.SHT_SYMTAB then
             symtab = shdr
             strtab = elf.shdr[shdr.link + 1]
-        elseif ((shdr.flags & wfelf.SHF_ALLOC) ~= 0) and (shdr.size > 0) then
+        elseif (shdr.size > 0) then
             local section_name = wfelf.read_string(elf_file, shstrtab, shdr.name)
             local data
             local data_empty = 0
@@ -299,6 +290,7 @@ local function romlink_run(args, linker_args)
             if data ~= nil then
                 local section_entry = {
                     ["input_index"] = i - 1,
+                    ["input_alloc"] = ((shdr.flags & wfelf.SHF_ALLOC) ~= 0),
                     ["name"] = clean_section_name(section_name),
                     ["data"] = data,
                     ["empty"] = data_empty
@@ -448,7 +440,7 @@ local function romlink_run(args, linker_args)
         end
 
         for i, v in pairs(sections) do
-            if #v.data > 0 and v.input_index == i - 1 then
+            if #v.data > 0 and v.input_index == i - 1 and v.input_alloc then
                 if retained_sections[v.input_index] then
                     allocator:add(v)
                 else
@@ -458,7 +450,9 @@ local function romlink_run(args, linker_args)
         end
     else
         for i, v in pairs(sections) do
-            allocator:add(v)
+            if v.input_alloc then
+                allocator:add(v)
+            end
         end
     end
 
@@ -479,6 +473,8 @@ local function romlink_run(args, linker_args)
     emit_symbol(symbols_by_name, "__wf_heap_start", heap_start)
     emit_symbol(symbols_by_name, "__wf_heap_top", heap_start + heap_length)
     emit_symbol(symbols_by_name, "__wf_data_block", entry_plus_offset(iram_entry, 0), entry_plus_offset(iram_entry, 0) & 0xFFFF0)
+
+    emit_raw_symbol(symbols_by_name, ".debug_frame!", 0)
 
     -- Apply relocations.
     for i, relocation in pairs(relocations) do
@@ -513,10 +509,14 @@ local function romlink_run(args, linker_args)
             if stringx.endswith(symbol[3], "!") then
                 value = segment << 4
             end
-            if r_type == wfelf.R_386_16 then
+            if r_type == wfelf.R_386_32 then
+                target_section.data = relocate32le(target_section.data, r_offset + 1, function(v) return v + value end)
+            elseif r_type == wfelf.R_386_16 then
                 target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v + value end)
             elseif r_type == wfelf.R_386_SUB16 then
                 target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v - value end)
+            elseif r_type == wfelf.R_386_SUB32 then
+                target_section.data = relocate32le(target_section.data, r_offset + 1, function(v) return v - value end)
             elseif r_type == wfelf.R_386_SEG16 then
                 target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return ((v << 4) + value) >> 4 end)
             else
