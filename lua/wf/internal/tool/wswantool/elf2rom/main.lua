@@ -146,8 +146,14 @@ end
 local function apply_section_name_to_entry(entry)
     local stype = nil
     local sempty = nil
-    if entry.name:find("^.iram[_.]") then
+    local iram_mode = nil
+    if entry.name:find("^.iram[cC]?[_.]") then
         stype = wfallocator.IRAM
+        iram_mode = entry.name[6]
+    elseif entry.name:find("^.iram[cC]?x[_.]") then
+        stype = wfallocator.IRAM
+        sempty = EMPTY_DONTCARE
+        iram_mode = entry.name[6]
     elseif entry.name:find("^.iramx[_.]") then
         stype = wfallocator.IRAM
         sempty = EMPTY_DONTCARE
@@ -181,7 +187,39 @@ local function apply_section_name_to_entry(entry)
             end
         elseif stype == wfallocator.IRAM then
             if #parts >= 2 then
-                entry.offset = tonumber(parts[2], 16)
+                local i = 2
+                entry.offset = {0, 0xFFFF}
+                if parts[2] == "screen" then
+                    entry.align = math.max(entry.align or 0, 0x800)
+                    entry.offset = {0, 0x7FFF}
+                    i = i + 1
+                elseif parts[2] == "sprite" or parts[2] == "sprites" then
+                    entry.align = math.max(entry.align or 0, 0x200)
+                    entry.offset = {0, 0x7FFF}
+                    i = i + 1
+                elseif parts[2] == "tile" or parts[2] == "2bpp" then
+                    entry.align = math.max(entry.align or 0, 0x10)
+                    entry.offset = {0x2000, 0x5FFF}
+                    i = i + 1
+                elseif parts[2] == "4bpp" then
+                    iram_mode = "c"
+                    entry.align = math.max(entry.align or 0, 0x20)
+                    entry.offset = {0x4000, 0xBFFF}
+                    i = i + 1
+                elseif parts[2] == "wave" then
+                    entry.align = math.max(entry.align or 0, 0x40)
+                    entry.offset = {0x0000, 0x3FFF}
+                    i = i + 1
+                end
+                if #parts >= i then
+                    entry.offset = tonumber(parts[i], 16)
+                else
+                    if iram_mode == "C" then
+                        entry.offset[1] = math.max(0x4000, entry.offset[1])
+                    elseif iram_mode ~= "c" then
+                        entry.offset[2] = math.min(0x3FFF, entry.offset[2])
+                    end
+                end
             end
         end
         entry.type = stype
@@ -255,9 +293,9 @@ local function romlink_run(args, linker_args)
     local gc_enabled = not args.disable_gc
     local config = toml.decodeFromFile(args.config or "wfconfig.toml")
     local allocator = wfallocator.Allocator()
-    -- TODO: Valid iram_size/sram_size values.
+    -- TODO: Valid sram_size values.
     local allocator_config = {
-        ["iram_size"] = 16384,
+        ["iram_size"] = 65536,
         ["sram_size"] = 0,
         ["rom_banks"] = config.cartridge.rom_banks
     }

@@ -111,92 +111,69 @@ function Bank:try_place(entry, simulate)
         end
         return true, eoffset
     else
+        -- TODO: Merge adjacent entries.
+        local eoffset_min = 0
+        local eoffset_max = self.size
         if entry.offset ~= nil then
-            -- Offset defined.
-            -- Doesn't handle alignment!
-            -- TODO: Merge adjacent entries.
-            local estart = entry.offset
-            local eend = entry.offset + #entry.data - 1
+            if type(entry.offset) == "table" then
+                eoffset_min = math.max(eoffset_min, entry.offset[1])
+                eoffset_max = math.min(eoffset_max, entry.offset[2] + 1)
+            else
+                eoffset_min = entry.offset
+                eoffset_max = entry.offset + #entry.data
+            end
+        end
 
-            local previous = self.entries[1]
-            if eend < previous.offset then
+        local previous = self.entries[1]
+
+        local gap_start = eoffset_min
+        local gap_end = math.min(math.min(eoffset_max, self.size), previous.offset)
+
+        local gap = gap_end - gap_start
+        if gap >= #entry.data then
+            local eoffset = calc_eoffset(gap_start, gap_end, #entry.data, self.descending, entry.align)
+            if eoffset ~= nil then
                 if not simulate then
-                    entry.offset = estart
+                    entry.offset = eoffset
                     table.insert(self.entries, 1, entry)
                 end
-                return true, estart
+                return true, eoffset
             end
+        end
 
-            for i=2,#self.entries do
-                local current = self.entries[i]
+        for i=2,#self.entries do
+            local current = self.entries[i]
 
-                if estart >= (previous.offset + #previous.data) and estart < current.offset then
-                    local gap = current.offset - estart
-                    if gap >= #entry.data then
-                        if not simulate then
-                            entry.offset = estart
-                            table.insert(self.entries, i, entry)
-                        end
-                        return true, estart
-                    end
-                end
+            gap_start = math.max(eoffset_min, previous.offset + #previous.data)
+            gap_end = math.min(math.min(eoffset_max, self.size), current.offset)
 
-                previous = current
-            end
-            
-            if estart >= (previous.offset + #previous.data) then
-                local gap = self.size - estart
-                if gap >= #entry.data then
-                    if not simulate then
-                        entry.offset = estart
-                        table.insert(self.entries, entry)
-                    end
-                    return true, estart
-                end
-            end
-        else
-            -- Offset not defined.
-            -- TODO: Merge adjacent entries.
-            local previous = self.entries[1]
-            if previous.offset >= #entry.data then
-                local eoffset = calc_eoffset(0, previous.offset, #entry.data, self.descending, entry.align)
-                if eoffset ~= nil then
-                    if not simulate then
-                        entry.offset = eoffset
-                        table.insert(self.entries, 1, entry)
-                    end
-                    return true, eoffset
-                end
-            end
-
-            for i=2,#self.entries do
-                local current = self.entries[i]
-
-                local gap = current.offset - previous.offset - #previous.data
-                if gap >= #entry.data then
-                    local eoffset = calc_eoffset(previous.offset + #previous.data, current.offset, #entry.data, self.descending, entry.align)
-                    if eoffset ~= nil then
-                        if not simulate then
-                            entry.offset = eoffset
-                            table.insert(self.entries, i, entry)
-                        end
-                        return true, eoffset
-                    end
-                end
-
-                previous = current
-            end
-
-            local gap = self.size - previous.offset - #previous.data
+            gap = gap_end - gap_start
             if gap >= #entry.data then
-                local eoffset = calc_eoffset(previous.offset + #previous.data, self.size, #entry.data, self.descending, entry.align)
+                local eoffset = calc_eoffset(gap_start, gap_end, #entry.data, self.descending, entry.align)
                 if eoffset ~= nil then
                     if not simulate then
                         entry.offset = eoffset
-                        table.insert(self.entries, entry)
+                        table.insert(self.entries, i, entry)
                     end
                     return true, eoffset
                 end
+            end
+
+            previous = current
+        end
+
+        gap_start = math.max(eoffset_min, previous.offset + #previous.data)
+        gap_end = math.min(eoffset_max, self.size)
+
+        gap = gap_end - gap_start
+        if gap >= #entry.data then
+            local eoffset = calc_eoffset(gap_start, gap_end, #entry.data, self.descending, entry.align)
+            if eoffset ~= nil then
+                if not simulate then
+                    entry.offset = eoffset
+                    table.insert(self.entries, entry)
+                end
+                return true, eoffset
             end
         end
     end
@@ -224,10 +201,10 @@ end
 -- * data: binary data to add
 -- * type: M.SRAM, M.IRAM, M.BANK...
 -- * bank: physical bank index to add to
--- * offset: offset in physical bank to add to
+-- * offset: offset in physical bank to add to; can be a value or a range
 -- * align: alignment
 function Allocator:add(entry)
-    if entry.offset then
+    if entry.offset ~= nil and type(entry.offset) == "number" then
         table.insert(self.fixed_entries, entry)
     else
         table.insert(self.entries, entry)
@@ -309,6 +286,20 @@ local function try_place_entry_inner(banks, entry)
             start_bank = start_bank + 1
             start_offset = 0
         end
+        if entry.offset ~= nil then
+            if type(entry.offset) == "table" then
+                -- TODO: support descending alignment properly
+                if start_offset > entry.offset[1] then
+                    return false
+                end
+                start_offset = entry.offset[1]
+            else
+                if start_offset > entry.offset then
+                    return false
+                end
+                start_offset = entry.offset
+            end
+        end
 
         local joined_linear_start = (start_bank * bank.size + start_offset)
         local joined_linear_end = (end_bank * bank.size + end_offset)
@@ -317,7 +308,9 @@ local function try_place_entry_inner(banks, entry)
             return false
         end
 
-        joined_linear_start = calc_eoffset(joined_linear_start, joined_linear_end, #entry.data, bank.descending, entry.align)
+        if entry.offset == nil then
+            joined_linear_start = calc_eoffset(joined_linear_start, joined_linear_end, #entry.data, bank.descending, entry.align)
+        end
         joined_linear_end = joined_linear_start + #entry.data
         local joined_start_bank = joined_linear_start // bank.size
         local joined_start_offset = joined_linear_start % bank.size
@@ -433,6 +426,12 @@ local function copy_from_parent(entry)
     end
 end
 
+local function get_offset_for_compare(offset)
+    if offset == nil then return 2 end
+    if type(offset) == "table" then return 1 end
+    return 0
+end
+
 function Allocator:allocate(config, is_final)
     local banks = self.banks
     if banks == nil then
@@ -481,8 +480,10 @@ function Allocator:allocate(config, is_final)
         if a.type < b.type then return false end
         if a.bank ~= nil and b.bank == nil then return true end
         if a.bank == nil and b.bank ~= nil then return false end
-        if a.offset ~= nil and b.offset == nil then return true end
-        if a.offset == nil and b.offset ~= nil then return false end
+        local a_offset = get_offset_for_compare(a.offset)
+        local b_offset = get_offset_for_compare(b.offset)
+        if a_offset < b_offset then return true end
+        if a_offset > b_offset then return false end
         if a.align ~= nil and b.align == nil then return true end
         if a.align == nil and b.align ~= nil then return false end
         if not a.empty and b.empty then return true end
