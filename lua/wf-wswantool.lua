@@ -207,6 +207,9 @@ f:write([[
         "__erom" = .;
         "__erom!" = .;
         "__erom&" = .;
+        "__wf_data_block" = .;
+        "__wf_data_block!" = .;
+        "__wf_data_block&" = .;
         . = .;
     }
 
@@ -266,6 +269,12 @@ f:write([[
     __sdata = .;
     ".data" . : AT(ADDR(".erom") + SIZEOF(".erom"))
     {
+            SHORT(__lbss + 1);
+            SHORT(__sbss);
+            SHORT(0x8000);
+            SHORT(__ldata);
+            SHORT(__sdata);
+            SHORT(0x0000); 
             *(.rodata ".rodata.*[^&]")
             *(.data ".data.*[^&]")
     }
@@ -289,6 +298,8 @@ f:write([[
     . = ]] .. (section[3] + 1) .. [[;
     "__eheap!" = 0;
     __eheap = .;
+    "__wf_heap_top!" = 0;
+    __wf_heap_top = .;
 ]])
                 else
                     f:write([[
