@@ -46,6 +46,36 @@ _WFPROCESS.temp_dir = wftempfile.create_directory(true)
 _WFPROCESS.verbose = args.verbose or false
 
 -- TODO: Move to somewhere else.
+local bin2c_processor = function(obj) end
+
+if _WFPROCESS.target[1] == "wswan" then
+    bin2c_processor = function(obj, key)
+        if _WFPROCESS.target[2] ~= "bootfriend" then
+            obj.align = obj.align or 2
+            if obj.address_space == nil then obj.address_space = "__wf_rom" end
+            if obj.section == nil and obj.address_space == "__wf_rom"
+            and (obj.bank == 0 or obj.bank == 1 or obj.bank == "0" or obj.bank == "1" or obj.bank == "L") then
+                local section = ".rom" .. obj.bank
+                if obj.bank_index ~= nil then
+                    local index = obj.bank_index
+                    if type(index) == "number" then index = string.format("%X", index) end
+                    section = section .. "_" .. index
+                    if obj.bank_offset ~= nil then
+                        index = obj.bank_offset
+                        if type(index) == "number" then index = string.format("%X", index) end
+                        section = section .. "_" .. index
+                    end
+                end
+                obj.section = section .. ".a." .. key
+            end
+        end
+    end
+elseif _WFPROCESS.target[1] == "psx" then
+    bin2c_processor = function(obj)
+        obj.align = obj.align or 4
+    end
+end
+
 local default_bin2c_args = {}
 if (_WFPROCESS.target[1] == "wswan") and (_WFPROCESS.target[2] ~= "bootfriend") then
     default_bin2c_args.address_space = "__wf_rom"
@@ -229,12 +259,7 @@ if format == ".c" then
 
         local bin2c_entries = tablex.deepcopy(v)
         for entry_key, entry in pairs(bin2c_entries) do
-            entry = process.to_data(entry)
-            for k, v in pairs(default_bin2c_args) do
-                if entry[k] == nil then
-                    entry[k] = v
-                end
-            end
+            bin2c_processor(entry, entry_key)
             bin2c_entries[entry_key] = entry
             all_bin2c_entries[entry_key] = entry
         end

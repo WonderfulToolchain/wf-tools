@@ -131,7 +131,7 @@ end
 --- Emit a symbol accessible to C code.
 -- @tparam string|process.File name Symbol name; can be generated automaticaly from an input file.
 -- @tparam string|table|process.Data|process.File data Data to emit.
-function M.emit_symbol(name, data)
+function M.emit_symbol(name, data, options)
     if M.File:class_of(name) then
         name = _WFPROCESS.bin2c_default_prefix .. M.symbol(name)
     end
@@ -157,7 +157,10 @@ function M.emit_symbol(name, data)
     if _WFPROCESS.bin2c[header_name] == nil then
         _WFPROCESS.bin2c[header_name] = {}
     end
-    _WFPROCESS.bin2c[header_name][name] = data
+    _WFPROCESS.bin2c[header_name][name] = {
+        ["data"] = data,
+        ["options"] = options
+    }
 end
 
 return M

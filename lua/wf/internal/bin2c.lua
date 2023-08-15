@@ -40,6 +40,14 @@ function M.bin2c(c_file, h_file, program_name, entries)
             error("unsupported endianness: " .. endian)
         end
 
+        local attributes = entry.attributes or {}
+        if entry.align then
+            table.insert(attributes, "aligned(" .. entry.align .. ")")
+        end
+        if entry.section then
+            table.insert(attributes, "section(\"" .. entry.section .. "\")")
+        end
+
         if h_file ~= nil then
             h_file:write("#define " .. array_name .. "_size (" .. #data .. ")\n")
             h_file:write("extern const " .. dtype .. " ")
@@ -55,8 +63,13 @@ function M.bin2c(c_file, h_file, program_name, entries)
                 c_file:write(entry.address_space .. " ")
             end
             c_file:write(array_name .. "[" .. #data .. "] ")
-            if entry.align then
-                c_file:write("__attribute__((aligned(" .. entry.align .. "))) ")
+            if #attributes > 0 then
+                c_file:write("__attribute__((")
+                for i=1,#attributes do
+                    if i > 1 then c_file:write(", ") end
+                    c_file:write(attributes[i])
+                end
+                c_file:write(")) ")
             end
             c_file:write("= {");
             for i = 1, #data, width do
