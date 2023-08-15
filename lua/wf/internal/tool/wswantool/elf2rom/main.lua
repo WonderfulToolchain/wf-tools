@@ -205,7 +205,7 @@ end
 --   - 0x8000: followed by data if true, not followed by data if false
 -- Cap size at 65520 bytes.
 local function build_iram_data_push(data, joined_entry)
-    if joined_entry == nil then return end
+    if joined_entry == nil then return data end
 
     local length = #joined_entry.data
     local offset = joined_entry.offset
