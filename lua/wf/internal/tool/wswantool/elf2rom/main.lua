@@ -216,6 +216,10 @@ local function apply_section_name_to_entry(entry)
                     entry.align = math.max(entry.align or 0, 0x40)
                     entry.offset = {0x0000, 0x3FFF}
                     i = i + 1
+                elseif parts[2] == "palette" then
+                    entry.align = math.max(entry.align or 0, 0x20)
+                    entry.offset = {0xFE00, 0xFFFF}
+                    i = i + 1
                 end
                 if #parts >= i then
                     entry.offset = tonumber(parts[i], 16)
