@@ -12,7 +12,7 @@ local function mkpsexe_run(args, linker_args)
     local config = toml.decodeFromFile(args.config or "wfconfig.toml")
     local elf_file <close> = io.open(args.input, "rb")
     local elf_file_root, elf_file_ext = path.splitext(args.input)
-    local elf = wfelf.parse(elf_file, wfelf.ELFCLASS32, wfelf.ELFDATA2LSB, wfelf.EM_MIPS)
+    local elf = wfelf.ELF(elf_file, wfelf.ELFCLASS32, wfelf.ELFDATA2LSB, wfelf.EM_MIPS)
 
     print_verbose(string.format("Entry point: %08X", elf.entry))
     local target_text_start = 0xFFFFFFFF

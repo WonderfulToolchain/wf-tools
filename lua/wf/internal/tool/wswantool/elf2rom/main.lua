@@ -54,8 +54,18 @@ local function entry_plus_offset(entry, offset)
     end
 end
 
+local function vma_entry_plus_offset(entry, offset)
+    local logical_address = entry_plus_offset(entry, offset)
+    if entry.type >= -2 then
+        logical_address = logical_address | ((entry.bank & 0xFFF) << 20)
+    end
+    return logical_address
+end
+
 local function get_linear_address(symbol)
-    if symbol[2].shndx >= wfelf.SHN_ABS then
+    if symbol[2] == nil then
+        return entry_plus_offset(symbol[1], 0)
+    elseif symbol[2].shndx >= wfelf.SHN_ABS then
         if symbol[2].shndx == wfelf.SHN_ABS then
             return symbol[2].value
         else
@@ -65,6 +75,22 @@ local function get_linear_address(symbol)
         return symbol[2].value
     else
         return entry_plus_offset(symbol[1], symbol[2].value)
+    end
+end
+
+local function get_vma_address(symbol)
+    if symbol[2] == nil then
+        return vma_entry_plus_offset(symbol[1], 0)
+    elseif symbol[2].shndx >= wfelf.SHN_ABS then
+        if symbol[2].shndx == wfelf.SHN_ABS then
+            return symbol[2].value
+        else
+            error(string.format("unsupported ELF section index 0x%04X", symbol[2].shndx))
+        end
+    elseif symbol[1] == nil then
+        return symbol[2].value
+    else
+        return vma_entry_plus_offset(symbol[1], symbol[2].value)
     end
 end
 
@@ -234,7 +260,7 @@ local function romlink_run(args, linker_args)
 
     local elf_file <close> = io.open(args.input, "rb")
     local elf_file_root, elf_file_ext = path.splitext(args.input)
-    local elf = wfelf.parse(elf_file, wfelf.ELFCLASS32, wfelf.ELFDATA2LSB, wfelf.EM_386)
+    local elf = wfelf.ELF(elf_file, wfelf.ELFCLASS32, wfelf.ELFDATA2LSB, wfelf.EM_386)
 
     local rom_header = {
         ["type"] = 0,
@@ -265,6 +291,7 @@ local function romlink_run(args, linker_args)
     local strtab, symtab
 
     local retained_sections = {}
+    local allocated_sections = {}
 
     for i=1,#elf.shdr do
         local shdr = elf.shdr[i]
@@ -287,14 +314,14 @@ local function romlink_run(args, linker_args)
             else
                 data = nil
             end
+            local section_entry = {
+                ["input_index"] = i - 1,
+                ["input_alloc"] = ((shdr.flags & wfelf.SHF_ALLOC) ~= 0),
+                ["name"] = clean_section_name(section_name),
+                ["data"] = data,
+                ["empty"] = data_empty
+            }
             if data ~= nil then
-                local section_entry = {
-                    ["input_index"] = i - 1,
-                    ["input_alloc"] = ((shdr.flags & wfelf.SHF_ALLOC) ~= 0),
-                    ["name"] = clean_section_name(section_name),
-                    ["data"] = data,
-                    ["empty"] = data_empty
-                }
                 if shdr.addralign >= 1 then
                     section_entry.align = shdr.addralign
                 elseif #data >= 2 then
@@ -320,8 +347,8 @@ local function romlink_run(args, linker_args)
                     section_entry.align = 16
                 end
                 sections_by_name[section_entry.name] = section_entry
-                sections[i] = section_entry
             end
+            sections[i] = section_entry
         end
     end
     -- Link segelf symbols ("symbol!", etc.) by name to their regular variants.
@@ -346,6 +373,9 @@ local function romlink_run(args, linker_args)
         sym.name, sym.value, sym.size, sym.info, sym.other, sym.shndx = string.unpack(
             "<I4I4I4BBI2", elf_file:read(symtab.entsize)
         )
+        if sym.shndx == wfelf.SHN_XINDEX then
+            error("TODO: handle SHN_XINDEX - workaround: disable -ffunction-sections, -fdata-sections, or both")
+        end
         local symbol_type = sym.info & 0xF
         local symbol_name
         if symbol_type == wfelf.STT_SECTION then
@@ -440,17 +470,21 @@ local function romlink_run(args, linker_args)
         end
 
         for i, v in pairs(sections) do
-            if #v.data > 0 and v.input_index == i - 1 and v.input_alloc then
+            if v.data ~= nil and #v.data > 0 and v.input_index == i - 1 and v.input_alloc then
                 if retained_sections[v.input_index] then
+                    allocated_sections[i] = true
                     allocator:add(v)
                 else
-                    print("Removing section (GC): " .. v.name)
+                    if args.verbose then
+                        print("[gc] removing section " .. v.name)
+                    end
                 end
             end
         end
     else
         for i, v in pairs(sections) do
             if v.input_alloc then
+                allocated_sections[i] = true
                 allocator:add(v)
             end
         end
@@ -581,20 +615,124 @@ local function romlink_run(args, linker_args)
         end
     end
 
-    for i, bank in pairs(allocator.banks[wfallocator.IRAM]) do
+    --[[ for i, bank in pairs(allocator.banks[wfallocator.IRAM]) do
         for j, entry in pairs(bank.entries) do
             print((entry.name or "") .. " " .. entry.bank .. " " .. entry.offset)
         end
-    end
+    end ]]
 
     -- Build relocated ELF.
+    -- This should be done last, as it destroys "elf".
     if args.output_elf ~= nil then
-        -- TODO
+        -- Limit ELFs to 2048 banks = 128 MB. As the 2003 mapper only goes up
+        -- to 64 MB, it is unlikely for ROMs to go much bigger - we'll deal
+        -- with this when it becomes a problem.
+        if rom_bank_first < (65536 - 0x800) then
+            error("rom file too large to create ELF")
+        end
+        
+        local out_file <close> = io.open(args.output_elf, "wb")
+        local offset = elf:get_header_size()
+
+        -- Edit ELF contents.
+        elf.entry = get_vma_address(start_symbol)
+        elf.phdr = {}
+        local old_shdr = elf.shdr
+        local old_shstrndx = elf.shstrndx
+
+        -- TODO: Emit new symbols.
+        elf.shdr = {}
+        local shdr_mapping = {} -- old -> new
+        for i=1,#old_shdr do
+            local shdr = old_shdr[i]
+            local add_shdr = false
+            if shdr.type == wfelf.SHT_PROGBITS or shdr.type == wfelf.SHT_NOBITS then
+                local section = sections[i]
+                if section ~= nil then
+                    local section_name = wfelf.read_string(elf_file, shstrtab, shdr.name)
+                    local section_symbol = {section, nil, ""}
+                    
+                    local address = get_vma_address(section_symbol)
+                    if stringx.endswith(section_name, "!") then
+                        local linear, segment, offset = get_linear_logical_address(section_symbol)
+                        shdr.addr = (address & 0xFFF00000) | (segment << 4)
+                    elseif stringx.endswith(section_name, "&") then
+                        shdr.addr = (address & 0xFFF00000) | ((address + #section.data) & 0x000FFFFF)
+                    else
+                        shdr.addr = address
+                    end
+                end
+
+                shdr.offset = offset
+                if section == nil or (not allocated_sections[i]) then
+                    shdr.size = 0
+                else
+                    shdr.size = #section.data
+
+                    out_file:seek("set", offset)
+                    out_file:write(section.data)
+                end
+                add_shdr = true
+            elseif shdr.type == wfelf.SHT_STRTAB then
+                elf_file:seek("set", shdr.offset)
+                shdr.offset = offset
+
+                out_file:seek("set", offset)
+                out_file:write(elf_file:read(shdr.size))
+                add_shdr = true
+            elseif shdr.type == wfelf.SHT_SYMTAB then
+                -- Emit new symbol table
+                local symtab_pack = "<I4I4I4BBI2"
+                symtab.entsize = string.packsize(symtab_pack)
+                symtab.size = 0
+                symtab.offset = offset
+                out_file:seek("set", offset)
+
+                for i, sym in pairs(symbols) do
+                    local shndx = wfelf.SHN_ABS
+                    if sym[2] ~= nil then
+                        if sym[2].shndx ~= nil then
+                            shndx = sym[2].shndx
+                            if shndx < 0xFFF0 then
+                                local map = shdr_mapping[shndx + 1]
+                                if map ~= nil then
+                                    shndx = map - 1
+                                end
+                            end
+                        end
+
+                        out_file:write(string.pack(symtab_pack,
+                            sym[2].name, sym[2].value, sym[2].size, sym[2].info, sym[2].other,
+                            shndx
+                        ))
+                        symtab.size = symtab.size + symtab.entsize
+                    end
+                end
+
+                offset = offset + symtab.size
+                add_shdr = true
+            end
+
+            if add_shdr then
+                offset = offset + shdr.size
+                table.insert(elf.shdr, shdr)
+                shdr_mapping[i] = #elf.shdr
+            end
+        end
+
+        -- Fix shdr.link mappings.
+        elf.shstrndx = shdr_mapping[elf.shstrndx + 1] - 1
+        for i=1,#elf.shdr do
+            local shdr = elf.shdr[i]
+            if shdr_mapping[shdr.link + 1] then
+                shdr.link = shdr_mapping[shdr.link + 1] - 1
+            end
+        end
+
+        out_file:seek("set", 0)
+        elf:write_header(out_file)
     end
 end
-
--- TODO:
--- --output-elf  (optional string)  Output ELF file name; stored on request.
 
 return {
     ["arguments"] = [[
@@ -602,6 +740,7 @@ return {
   -c,--config   (optional string)  Configuration file name;
                                    wfconfig.toml is used by default.
   -o,--output   (string)           Output ROM file name.
+  --output-elf  (optional string)  Output ELF file name; stored on request.
   --disable-gc                     Disable section garbage collection.
   --trim                           Trim the assembled ROM by removing unused
                                    space from the beginning of the file.
