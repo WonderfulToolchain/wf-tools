@@ -577,7 +577,7 @@ local function romlink_run(args, linker_args)
     allocator:add(iram_entry)
     allocator:allocate(allocator_config, false)
 
-    local heap_start, heap_length = iram:largest_gap()
+    local heap_start, heap_length = iram:largest_gap(0, 0x3FFF)
     emit_symbol(symbols_by_name, "__wf_heap_start", heap_start)
     emit_symbol(symbols_by_name, "__wf_heap_top", heap_start + heap_length)
     emit_symbol(symbols_by_name, "__wf_data_block", entry_plus_offset(iram_entry, 0), entry_plus_offset(iram_entry, 0) & 0xFFFF0, iram_entry)

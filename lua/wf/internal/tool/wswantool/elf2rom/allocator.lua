@@ -67,29 +67,37 @@ local function calc_eoffset(estart, eend, elen, descending, align)
     return nil
 end
 
-function Bank:largest_gap()
-    if self:is_empty() then
-        return 0, self.size
+function Bank:largest_gap(eoffset_min, eoffset_max)
+    eoffset_min = eoffset_min or 0
+    eoffset_max = eoffset_max or self.size - 1
+    if not self:is_empty() then
+        return eoffset_min, eoffset_max + 1
     else
         local previous = self.entries[1]
-        local gap_start = 0
-        local gap_size = previous.offset
+        local gap_start = math.max(eoffset_min, 0)
+        local gap_size = previous.offset - eoffset_min
 
         for i=2,#self.entries do
             local current = self.entries[i]
 
-            local current_gap = current.offset - previous.offset - #previous.data
-            if current_gap > gap_size then
-                gap_start = previous.offset + #previous.data
+            local current_gap_start = math.max(eoffset_min, previous.offset + #previous.data)
+            local current_gap_end = math.min(math.min(eoffset_max, self.size), current.offset)
+
+            local current_gap = current_gap_end - current_gap_start
+            if current_gap > 0 and current_gap > gap_size then
+                gap_start = current_gap_start
                 gap_size = current_gap
             end
 
             previous = current
         end
 
-        local current_gap = self.size - previous.offset - #previous.data
-        if current_gap > gap_size then
-            gap_start = previous.offset + #previous.data
+        local current_gap_start = math.max(eoffset_min, previous.offset + #previous.data)
+        local current_gap_end = math.min(eoffset_max, self.size)
+
+        local current_gap = current_gap_end - current_gap_start
+        if current_gap > 0 and current_gap > gap_size then
+            gap_start = current_gap_start
             gap_size = current_gap
         end
 
