@@ -595,6 +595,9 @@ local function romlink_run(args, linker_args)
                 target_section.data = relocate32le(target_section.data, r_offset + 1, function(v) return v - value end)
             elseif r_type == wfelf.R_386_SEG16 then
                 target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return ((v << 4) + value) >> 4 end)
+            elseif r_type == wfelf.R_386_PC16 then
+                value = value - entry_plus_offset(target_section, r_offset)
+                target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v + value end)
             else
                 error("unsupported relocation type " .. r_type)
             end
