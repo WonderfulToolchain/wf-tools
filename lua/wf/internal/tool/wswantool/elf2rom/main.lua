@@ -101,12 +101,18 @@ end
 local function get_linear_logical_address(symbol, offset)
     offset = offset or 0
     local linear = get_linear_address(symbol)
-    if symbol[1] ~= nil and (symbol[1].type == 2 or symbol[1].type == -1) then
-        return linear + offset, (linear >> 4), offset + (linear & 0xF)
+    local segment
+    if symbol[1] ~= nil and symbol[1].segment ~= nil then
+        segment = entry_plus_offset(symbol[1].segment, 0)
+    elseif symbol[1] ~= nil and (symbol[1].type == 2 or symbol[1].type == -1) then
+        segment = (linear & 0xFFFF0)
     else
         linear = linear + offset
-        return linear, (linear & 0xF0000) >> 4, (linear & 0xFFFF)
+        offset = 0
+        segment = (linear & 0xF0000)
     end
+    linear = linear + offset
+    return linear, segment >> 4, linear - segment
 end
 
 local function relocate16le(data, offset, f)
@@ -305,6 +311,7 @@ local function romlink_run(args, linker_args)
     local elf = wfelf.ELF(elf_file, wfelf.ELFCLASS32, wfelf.ELFDATA2LSB, wfelf.EM_386)
 
     local rom_header = {
+        ["name"] = "(wf) ROM header",
         ["type"] = 0,
         ["bank"] = 0xFFFF,
         ["offset"] = 0xFFF0,
@@ -319,6 +326,14 @@ local function romlink_run(args, linker_args)
         ["empty"] = EMPTY_DONTCARE
     }
     allocator:add(irq_vectors)
+
+    local near_section = {
+        ["name"] = "(wf) near ROM section",
+        ["type"] = 2,
+        ["bank"] = 0xFFF,
+        ["data"] = "",
+        ["align"] = 16
+    }
 
     -- Parse ELF.
     if #elf.phdr > 0 then
@@ -371,11 +386,14 @@ local function romlink_run(args, linker_args)
                 end
                 if not apply_section_name_to_entry(section_entry) then
                     if stringx.startswith(section_name, ".fartext")
-                    or section_name == ".text"
-                    or section_name == ".start"
                     or stringx.startswith(section_name, ".farrodata") then
                         section_entry.type = 2
                         section_entry.bank = 0xFFF
+                    elseif stringx.startswith(section_name, ".text")
+                    or section_name == ".start" then
+                        section_entry.segment = near_section
+                        section_entry.segment_offset = #near_section.data
+                        near_section.data = near_section.data .. data
                     else
                         section_entry.type = wfallocator.IRAM
                     end
@@ -514,8 +532,7 @@ local function romlink_run(args, linker_args)
         for i, v in pairs(sections) do
             if v.data ~= nil and #v.data > 0 and v.input_index == i - 1 and v.input_alloc then
                 if retained_sections[v.input_index] then
-                    allocated_sections[i] = true
-                    allocator:add(v)
+                    allocated_sections[i] = v
                 else
                     if args.verbose then
                         print("[gc] removing section " .. v.name)
@@ -526,13 +543,28 @@ local function romlink_run(args, linker_args)
     else
         for i, v in pairs(sections) do
             if v.input_alloc then
-                allocated_sections[i] = true
-                allocator:add(v)
+                allocated_sections[i] = v
             end
         end
     end
-
+    
+    for i, v in pairs(allocated_sections) do
+        if v.segment == nil then
+            allocator:add(v)
+        end
+    end
+    if #near_section.data > 0 then
+        allocator:add(near_section)
+    end
     allocator:allocate(allocator_config, false)
+
+    for i, v in pairs(sections) do
+        if v.segment ~= nil then
+            v.type = v.segment.type
+            v.bank = v.segment.bank
+            v.offset = v.segment.offset + v.segment_offset
+        end
+    end
 
     local iram = allocator.banks[wfallocator.IRAM][1]
     local iram_entry = {
@@ -618,6 +650,15 @@ local function romlink_run(args, linker_args)
     local linear, segment, offset = get_linear_logical_address(start_symbol)
     config.cartridge.start_segment = segment
     config.cartridge.start_offset = offset
+
+    for i, v in pairs(sections) do
+        if v.segment ~= nil then
+            v.segment.data =
+                v.segment.data:sub(1, v.segment_offset)
+                .. v.data
+                .. v.segment.data:sub(v.segment_offset + #v.data + 1)
+        end
+    end
 
     -- Final ROM allocation, calculate size.
     allocator:allocate(allocator_config, true)
