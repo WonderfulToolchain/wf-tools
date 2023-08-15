@@ -65,6 +65,8 @@ end
 local function get_linear_address(symbol)
     if symbol[2] == nil then
         return entry_plus_offset(symbol[1], 0)
+    elseif type(symbol[2]) == "number" then
+        return symbol[2]
     elseif symbol[2].shndx >= wfelf.SHN_ABS then
         if symbol[2].shndx == wfelf.SHN_ABS then
             return symbol[2].value
@@ -81,6 +83,8 @@ end
 local function get_vma_address(symbol)
     if symbol[2] == nil then
         return vma_entry_plus_offset(symbol[1], 0)
+    elseif type(symbol[2]) == "number" then
+        return symbol[2]
     elseif symbol[2].shndx >= wfelf.SHN_ABS then
         if symbol[2].shndx == wfelf.SHN_ABS then
             return symbol[2].value
@@ -97,7 +101,7 @@ end
 local function get_linear_logical_address(symbol, offset)
     offset = offset or 0
     local linear = get_linear_address(symbol)
-    if symbol[1] == nil or (symbol[1].type == 2 or symbol[1].type == -1) then
+    if symbol[1] ~= nil and (symbol[1].type == 2 or symbol[1].type == -1) then
         return linear + offset, (linear >> 4), offset + (linear & 0xF)
     else
         linear = linear + offset
@@ -119,9 +123,9 @@ local function relocate32le(data, offset, f)
     return data:sub(1, offset - 1) .. string.char(spot & 0xFF) .. string.char((spot >> 8) & 0xFF) .. string.char((spot >> 16) & 0xFF) .. string.char((spot >> 24) & 0xFF) .. data:sub(offset + 4)
 end
 
-local function emit_raw_symbol(symbols_by_name, name, value)
+local function emit_raw_symbol(symbols_by_name, name, value, section)
     symbols_by_name[name] = {
-        nil,
+        section,
         {
             ["value"] = value,
             ["size"] = 0,
@@ -133,10 +137,10 @@ local function emit_raw_symbol(symbols_by_name, name, value)
     }
 end
 
-local function emit_symbol(symbols_by_name, name, value, segment)
-    emit_raw_symbol(symbols_by_name, name, value)
-    emit_raw_symbol(symbols_by_name, name .. "!", segment or 0)
-    emit_raw_symbol(symbols_by_name, name .. "&", value)
+local function emit_symbol(symbols_by_name, name, value, segment, section)
+    emit_raw_symbol(symbols_by_name, name, value, section)
+    emit_raw_symbol(symbols_by_name, name .. "!", segment or 0, section)
+    emit_raw_symbol(symbols_by_name, name .. "&", value, section)
 end
 
 local function apply_section_name_to_entry(entry)
@@ -506,7 +510,7 @@ local function romlink_run(args, linker_args)
     local heap_start, heap_length = iram:largest_gap()
     emit_symbol(symbols_by_name, "__wf_heap_start", heap_start)
     emit_symbol(symbols_by_name, "__wf_heap_top", heap_start + heap_length)
-    emit_symbol(symbols_by_name, "__wf_data_block", entry_plus_offset(iram_entry, 0), entry_plus_offset(iram_entry, 0) & 0xFFFF0)
+    emit_symbol(symbols_by_name, "__wf_data_block", entry_plus_offset(iram_entry, 0), entry_plus_offset(iram_entry, 0) & 0xFFFF0, iram_entry)
 
     emit_raw_symbol(symbols_by_name, ".debug_frame!", 0)
 

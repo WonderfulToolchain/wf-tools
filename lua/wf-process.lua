@@ -51,28 +51,29 @@ local bin2c_processor = function(obj) end
 if _WFPROCESS.target[1] == "wswan" then
     bin2c_processor = function(obj, key)
         if _WFPROCESS.target[2] ~= "bootfriend" then
-            obj.align = obj.align or 2
-            if obj.address_space == nil then obj.address_space = "__wf_rom" end
-            if obj.section == nil and obj.address_space == "__wf_rom"
-            and (obj.bank == 0 or obj.bank == 1 or obj.bank == "0" or obj.bank == "1" or obj.bank == "L") then
-                local section = ".rom" .. obj.bank
-                if obj.bank_index ~= nil then
-                    local index = obj.bank_index
+            obj.align = obj.options.align or 2
+            obj.address_space = "__wf_rom"
+            if obj.options.section == nil
+            and (obj.options.bank == 0 or obj.options.bank == 1 or obj.options.bank == "0" or obj.options.bank == "1" or obj.options.bank == "L") then
+                local section = ".rom" .. obj.options.bank
+                if obj.options.bank_index ~= nil then
+                    local index = obj.options.bank_index
                     if type(index) == "number" then index = string.format("%X", index) end
                     section = section .. "_" .. index
-                    if obj.bank_offset ~= nil then
-                        index = obj.bank_offset
+                    if obj.options.bank_offset ~= nil then
+                        index = obj.options.bank_offset
                         if type(index) == "number" then index = string.format("%X", index) end
                         section = section .. "_" .. index
                     end
                 end
+                obj.bank = true
                 obj.section = section .. ".a." .. key
             end
         end
     end
 elseif _WFPROCESS.target[1] == "psx" then
     bin2c_processor = function(obj)
-        obj.align = obj.align or 4
+        obj.align = obj.options.align or 4
     end
 end
 

@@ -55,6 +55,9 @@ function M.bin2c(c_file, h_file, program_name, entries)
                 h_file:write(entry.address_space .. " ")
             end
             h_file:write(array_name .. "[" .. #data .. "];\n")
+            if entry.bank then
+                h_file:write("extern const void *__bank_" .. array_name .. ";\n")
+            end
         end
     
         if c_file ~= nil then

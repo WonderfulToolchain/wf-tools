@@ -143,7 +143,7 @@ function M.emit_symbol(name, data, options)
             data = M.to_data(data).data
         else
             for k, v in pairs(data) do
-                M.emit_symbol(name .. "_" .. k, v)
+                M.emit_symbol(name .. "_" .. k, v, options)
             end
             return
         end
@@ -159,7 +159,7 @@ function M.emit_symbol(name, data, options)
     end
     _WFPROCESS.bin2c[header_name][name] = {
         ["data"] = data,
-        ["options"] = options
+        ["options"] = options or {}
     }
 end
 
