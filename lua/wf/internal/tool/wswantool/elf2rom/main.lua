@@ -410,8 +410,8 @@ local function romlink_run(args, linker_args)
                 if #data > 0xFFF0 then
                     section_entry.align = 16
                 end
-                sections_by_name[section_entry.name] = section_entry
             end
+            sections_by_name[section_entry.name] = section_entry
             sections[i] = section_entry
         end
     end
@@ -622,13 +622,15 @@ local function romlink_run(args, linker_args)
                 value = segment << 4
             end
             if r_type == wfelf.R_386_32 then
+                -- debug section workaround: use ELF VMA address
+                value = get_vma_address(symbol)
                 target_section.data = relocate32le(target_section.data, r_offset + 1, function(v) return v + value end)
             elseif r_type == wfelf.R_386_16 then
                 target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v + value end)
             elseif r_type == wfelf.R_386_SUB16 then
                 target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v - value end)
             elseif r_type == wfelf.R_386_SUB32 then
-                target_section.data = relocate32le(target_section.data, r_offset + 1, function(v) return v - value end)
+                -- debug section workaround: skip this relocation
             elseif r_type == wfelf.R_386_SEG16 then
                 target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return ((v << 4) + value) >> 4 end)
             elseif r_type == wfelf.R_386_PC16 then
@@ -705,12 +707,6 @@ local function romlink_run(args, linker_args)
         end
     end
 
-    --[[ for i, bank in pairs(allocator.banks[wfallocator.IRAM]) do
-        for j, entry in pairs(bank.entries) do
-            print((entry.name or "") .. " " .. entry.bank .. " " .. entry.offset)
-        end
-    end ]]
-
     -- Build relocated ELF.
     -- This should be done last, as it destroys "elf".
     if args.output_elf ~= nil then
@@ -738,7 +734,7 @@ local function romlink_run(args, linker_args)
             local add_shdr = false
             if shdr.type == wfelf.SHT_PROGBITS or shdr.type == wfelf.SHT_NOBITS then
                 local section = sections[i]
-                if section ~= nil then
+                if section ~= nil and section.input_alloc then
                     local section_name = wfelf.read_string(elf_file, shstrtab, shdr.name)
                     local section_symbol = {section, nil, ""}
                     
@@ -754,7 +750,7 @@ local function romlink_run(args, linker_args)
                 end
 
                 shdr.offset = offset
-                if section == nil or (not allocated_sections[i]) then
+                if section == nil or (section.input_alloc and (not allocated_sections[i])) then
                     shdr.size = 0
                 else
                     shdr.size = #section.data
