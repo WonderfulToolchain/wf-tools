@@ -8,6 +8,7 @@ local utils = require('pl.utils')
 local toml = require('toml')
 local wfelf = require('wf.internal.elf')
 local wfmath = require('wf.internal.math')
+local wfnative = require('wf.internal.native')
 local wfpath = require('wf.internal.path')
 local wfutil = require('wf.internal.util')
 local wswan = require('wf.internal.platform.wswan')
@@ -118,15 +119,15 @@ end
 local function relocate16le(data, offset, f)
     local spot = (data:byte(offset) & 0xFF) | ((data:byte(offset + 1) & 0xFF) << 8)
     spot = f(spot)
-    -- TODO: This is slow :(
-    return data:sub(1, offset - 1) .. string.char(spot & 0xFF) .. string.char((spot >> 8) & 0xFF) .. data:sub(offset + 2)
+    spot = string.char(spot & 0xFF) .. string.char((spot >> 8) & 0xFF)
+    return wfnative.replace(data, spot, offset)
 end
 
 local function relocate32le(data, offset, f)
     local spot = (data:byte(offset) & 0xFF) | ((data:byte(offset + 1) & 0xFF) << 8) | ((data:byte(offset + 2) & 0xFF) << 16) | ((data:byte(offset + 3) & 0xFF) << 24)
     spot = f(spot)
-    -- TODO: This is slow :(
-    return data:sub(1, offset - 1) .. string.char(spot & 0xFF) .. string.char((spot >> 8) & 0xFF) .. string.char((spot >> 16) & 0xFF) .. string.char((spot >> 24) & 0xFF) .. data:sub(offset + 4)
+    spot = string.char(spot & 0xFF) .. string.char((spot >> 8) & 0xFF) .. string.char((spot >> 16) & 0xFF) .. string.char((spot >> 24) & 0xFF)
+    return wfnative.replace(data, spot, offset)
 end
 
 local function emit_raw_symbol(symbols_by_name, name, value, section)
