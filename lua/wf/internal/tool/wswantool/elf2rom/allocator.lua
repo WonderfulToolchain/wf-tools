@@ -67,16 +67,24 @@ local function calc_eoffset(estart, eend, elen, descending, align)
     return nil
 end
 
-function Bank:largest_gap(eoffset_min, eoffset_max)
+function Bank:find_gap(eoffset_min, eoffset_max, largest, minimum_size)
     eoffset_min = eoffset_min or 0
     eoffset_max = eoffset_max or self.size - 1
-    if not self:is_empty() then
+    if self:is_empty() then
         return eoffset_min, eoffset_max + 1
     else
         local previous = self.entries[1]
         local gap_start = math.max(eoffset_min, 0)
         local gap_size = previous.offset - eoffset_min
 
+        local function new_best_gap(new_gap_size)
+            if minimum_size ~= nil and new_gap_size < minimum_size then
+                return false
+            end
+            return (largest and (new_gap_size > gap_size))
+                or ((not largest) and (new_gap_size < gap_size))
+        end
+            
         for i=2,#self.entries do
             local current = self.entries[i]
 
@@ -84,7 +92,7 @@ function Bank:largest_gap(eoffset_min, eoffset_max)
             local current_gap_end = math.min(math.min(eoffset_max, self.size), current.offset)
 
             local current_gap = current_gap_end - current_gap_start
-            if current_gap > 0 and current_gap > gap_size then
+            if current_gap > 0 and new_best_gap(current_gap) then
                 gap_start = current_gap_start
                 gap_size = current_gap
             end
@@ -96,9 +104,13 @@ function Bank:largest_gap(eoffset_min, eoffset_max)
         local current_gap_end = math.min(eoffset_max, self.size)
 
         local current_gap = current_gap_end - current_gap_start
-        if current_gap > 0 and current_gap > gap_size then
+        if current_gap > 0 and new_best_gap(current_gap) then
             gap_start = current_gap_start
             gap_size = current_gap
+        end
+
+        if minimum_size ~= nil and gap_size < minimum_size then
+            return nil
         end
 
         return gap_start, gap_size
