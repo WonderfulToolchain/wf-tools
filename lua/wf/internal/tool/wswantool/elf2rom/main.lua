@@ -521,8 +521,7 @@ local function romlink_run(args, linker_args)
             local next_retained_sections = {}
             for i,v in pairs(new_retained_sections) do
                 retained_sections[i] = true
-            end
-            for i,v in pairs(new_retained_sections) do
+
                 if section_children[i] ~= nil then
                     for i2,v2 in pairs(section_children[i]) do
                         if retained_sections[i2] ~= true then
@@ -547,7 +546,7 @@ local function romlink_run(args, linker_args)
         end
     else
         for i, v in pairs(sections) do
-            if v.input_alloc then
+            if v.data ~= nil and #v.data > 0 and v.input_index == i - 1 and v.input_alloc then
                 allocated_sections[i] = v
             end
         end
@@ -660,10 +659,7 @@ local function romlink_run(args, linker_args)
 
     for i, v in pairs(sections) do
         if v.segment ~= nil then
-            v.segment.data =
-                v.segment.data:sub(1, v.segment_offset)
-                .. v.data
-                .. v.segment.data:sub(v.segment_offset + #v.data + 1)
+            v.segment.data = wfnative.replace(v.segment.data, v.data, v.segment_offset + 1)
         end
     end
 
