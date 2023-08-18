@@ -209,7 +209,6 @@ local function apply_section_name_to_entry(entry)
                     entry.offset = {0x2000, 0x5FFF}
                     i = i + 1
                 elseif parts[2] == "4bpp" then
-                    iram_mode = "c"
                     entry.align = math.max(entry.align or 0, 0x20)
                     entry.offset = {0x4000, 0xBFFF}
                     i = i + 1
@@ -225,9 +224,9 @@ local function apply_section_name_to_entry(entry)
                 if #parts >= i then
                     entry.offset = tonumber(parts[i], 16)
                 else
-                    if iram_mode == "C" then
+                    if iram_mode == "C" and entry.offset[2] >= 0x4000 then
                         entry.offset[1] = math.max(0x4000, entry.offset[1])
-                    elseif iram_mode ~= "c" then
+                    elseif iram_mode ~= "c" and entry.offset[1] < 0x4000 then
                         entry.offset[2] = math.min(0x3FFF, entry.offset[2])
                     end
                 end
