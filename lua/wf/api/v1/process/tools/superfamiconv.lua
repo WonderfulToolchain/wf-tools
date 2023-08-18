@@ -50,7 +50,7 @@ local function tool_run(command, inputs, output_mode, config)
             if config.tile_base then table.insert(args, "-T") table.insert(args, tostring(config.tile_base)) end
         end
         if command == nil or command == "palette" then
-            if config.color_zero then table.insert(args, "--color-zero") table.insert(args, tostring(config.color_zero)) end
+            if config.color_zero then table.insert(args, "--color-zero=" .. tostring(config.color_zero)) end
         end
         if command == "palette" then
             if config.palettes then table.insert(args, "-P") table.insert(args, tostring(config.palettes)) end
@@ -65,12 +65,12 @@ local function tool_run(command, inputs, output_mode, config)
         if command == "map" then
             if config.palette_base then table.insert(args, "-P") table.insert(args, tostring(config.palette_base)) end
             if config.map_size then
-                table.insert(args, "--map-width") table.insert(args, tostring(config.map_size[1]))
-                table.insert(args, "--map-height") table.insert(args, tostring(config.map_size[2]))
+                table.insert(args, "--map-width=" .. tostring(config.map_size[1]))
+                table.insert(args, "--map-height=" .. tostring(config.map_size[2]))
             end
             if config.map_split then
-                table.insert(args, "--split-width") table.insert(args, tostring(config.map_split[1]))
-                table.insert(args, "--split-height") table.insert(args, tostring(config.map_split[2]))
+                table.insert(args, "--split-width=" .. tostring(config.map_split[1]))
+                table.insert(args, "--split-height=" .. tostring(config.map_split[2]))
             end
             if config.column_order then table.insert(args, "--column-order") end
         end
