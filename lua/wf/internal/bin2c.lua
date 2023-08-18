@@ -14,12 +14,12 @@ function M.bin2c(c_file, h_file, program_name, entries)
 
     if h_file ~= nil then
         h_file:write(comment_header)
-        h_file:write("#pragma once\n#include <stdint.h>\n#include <wonderful.h>\n\n")
+        h_file:write("#pragma once\n#include <stddef.h>\n#include <stdint.h>\n#include <wonderful.h>\n\n")
     end
 
     if c_file ~= nil then
         c_file:write(comment_header)
-        c_file:write("#include <stdint.h>\n#include <wonderful.h>\n\n")
+        c_file:write("#include <stddef.h>\n#include <stdint.h>\n#include <wonderful.h>\n\n")
     end
 
     for array_name, entry in pairs(entries) do
@@ -57,6 +57,7 @@ function M.bin2c(c_file, h_file, program_name, entries)
             h_file:write(array_name .. "[" .. #data .. "];\n")
             if entry.bank then
                 h_file:write("extern const void *__bank_" .. array_name .. ";\n")
+                h_file:write("#define " .. array_name .. "_bank ((size_t) &__bank_" .. array_name .. ")\n")
             end
         end
     
