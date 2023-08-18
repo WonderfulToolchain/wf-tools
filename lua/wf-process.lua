@@ -30,14 +30,15 @@ The build system is expected to process the .d file (if requested)
 and compile the .c file (likewise if requested).
 
 Tool arguments:
-  <script>        (string)           Script filename.
-  <args...>       (optional string)  Script inputs.
-  -f,--filesystem (optional string)  Filesystem directory.
-  -o,--output     (optional string)  Output file (.c).
-  -t,--target     (optional string)  Target name, in Wonderful convention.
-  --symbol-prefix (optional string)  Default symbol prefix.
-  -D                                 Emit .d dependency file.
-  -v,--verbose                       Enable verbose output.
+  <script>         (string)           Script filename.
+  <args...>        (optional string)  Script inputs.
+  -f,--filesystem  (optional string)  Filesystem directory.
+  -o,--output      (optional string)  Output file (.c).
+  -t,--target      (optional string)  Target name, in Wonderful convention.
+  --symbol-prefix  (optional string)  Default symbol prefix.
+  -D,--depfile     (optional string)  Emit .d dependency file.
+  --depfile-target (optional string)  .d dependency file target.
+  -v,--verbose                        Enable verbose output.
 ]]
 
 _WFPROCESS = {}
@@ -149,11 +150,14 @@ local sinputs = {}
 local soutputs = {}
 local scapture_enabled = false
 _WFPROCESS.access_file = function(name, mode)
-    if scapture_enabled and not stringx.startswith(name, _WFPROCESS.temp_dir.name) then
-        if mode == nil or stringx.startswith(mode, "r") then
-            sinputs[name] = true
-        else
-            soutputs[name] = true
+    if scapture_enabled then
+        name = path.abspath(name)
+        if not stringx.startswith(name, _WFPROCESS.temp_dir.name) then
+            if mode == nil or stringx.startswith(mode, "r") then
+                sinputs[name] = true
+            else
+                soutputs[name] = true
+            end
         end
     end
 end
@@ -242,8 +246,8 @@ end
 -- Run the script.
 local old_cwd = lfs.currentdir()
 local script_func = assert(loadfile(args.script, "bt", senv))
+sinputs[path.abspath(args.script)] = true
 path.chdir(scwd)
-sinputs[args.script] = true
 scapture_enabled = true
 script_func()
 path.chdir(old_cwd)
@@ -274,12 +278,20 @@ end
 
 -- Emit dependency file.
 scapture_enabled = false
-if args.D then
-    local depfile <close> = io.open(soutput .. ".d", "w")
+if args.depfile ~= nil then
+    local depfilename = args.depfile
+    if args.depfile == "" then
+        depfilename = soutput .. ".d"
+    end
+    local depfile <close> = io.open(depfilename, "w")
+    if args.depfile_target ~= nil then
+        soutputs = {}
+        soutputs[args.depfile_target] = true
+    end
     for ok, ov in pairs(soutputs) do
-        depfile:write(path.abspath(ok) .. ":")
+        depfile:write(ok .. ":")
         for ik, iv in pairs(sinputs) do
-            depfile:write(" " .. path.abspath(ik))
+            depfile:write(" " .. ik)
         end
         depfile:write("\n\n")
     end
