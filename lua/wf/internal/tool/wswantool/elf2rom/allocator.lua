@@ -69,9 +69,9 @@ end
 
 function Bank:find_gap(eoffset_min, eoffset_max, largest, minimum_size)
     eoffset_min = eoffset_min or 0
-    eoffset_max = eoffset_max or self.size - 1
+    eoffset_max = eoffset_max or self.size
     if self:is_empty() then
-        return eoffset_min, eoffset_max + 1
+        return eoffset_min, eoffset_max
     else
         local previous = self.entries[1]
         local gap_start = math.max(eoffset_min, 0)

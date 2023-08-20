@@ -299,29 +299,75 @@ local function build_iram_data(iram)
     return data
 end
 
-local function romlink_run(args, linker_args)
+local function run_linker(args, platform)
+    local config_filename = args.config or "wfconfig.toml"
+    local config = {}
+    if path.exists(config_filename) then
+        config = toml.decodeFromFile(config_filename)
+    end
+    if config.cartridge == nil then
+        config.cartridge = {}
+    end
+
     local gc_enabled = not args.disable_gc
-    local config = toml.decodeFromFile(args.config or "wfconfig.toml")
     local allocator = wfallocator.Allocator()
     -- TODO: Valid sram_size values.
     local allocator_config = {
         ["iram_size"] = 65536,
         ["sram_size"] = 0,
-        ["rom_banks"] = config.cartridge.rom_banks
+        ["rom_banks"] = 0
     }
+    if platform.mode == "cartridge" then
+    end
 
     local elf_file <close> = io.open(args.input, "rb")
     local elf_file_root, elf_file_ext = path.splitext(args.input)
     local elf = wfelf.ELF(elf_file, wfelf.ELFCLASS32, wfelf.ELFDATA2LSB, wfelf.EM_386)
 
-    local rom_header = {
-        ["name"] = "(wf) ROM header",
-        ["type"] = 0,
-        ["bank"] = 0xFFFF,
-        ["offset"] = 0xFFF0,
-        ["data"] = string.char(0):rep(16)
+    local default_alloc_type, default_alloc_bank
+    local far_sections_supported = false
+    local rom_header = nil
+
+    if platform.mode == "cartridge" then
+        allocator_config.rom_banks = config.cartridge.rom_banks
+        
+        rom_header = {
+            ["name"] = "(wf) ROM header",
+            ["type"] = 0,
+            ["bank"] = 0xFFFF,
+            ["offset"] = 0xFFF0,
+            ["data"] = string.char(0):rep(16)
+        }
+        allocator:add(rom_header)
+
+        default_alloc_type = 2
+        default_alloc_bank = 0xFFF
+        far_sections_supported = true
+    elseif platform.mode == "wgate" then
+        allocator_config.sram_size = 65536
+
+        local sram_padding = {
+            ["name"] = "(wf) SRAM padding",
+            ["type"] = wfallocator.SRAM,
+            ["bank"] = 0,
+            ["offset"] = 0,
+            ["data"] = string.char(0):rep(0x10)
+        }
+        allocator:add(sram_padding)
+
+        default_alloc_type = wfallocator.SRAM
+        default_alloc_bank = 0
+    else
+        error("unsupported platform: " .. platform.mode)
+    end
+
+    local near_section = {
+        ["name"] = "(wf) near section",
+        ["type"] = default_alloc_type,
+        ["bank"] = default_alloc_bank,
+        ["data"] = "",
+        ["align"] = 16
     }
-    allocator:add(rom_header)
 
     local irq_vectors = {
         ["type"] = wfallocator.IRAM,
@@ -330,14 +376,6 @@ local function romlink_run(args, linker_args)
         ["empty"] = EMPTY_DONTCARE
     }
     allocator:add(irq_vectors)
-
-    local near_section = {
-        ["name"] = "(wf) near ROM section",
-        ["type"] = 2,
-        ["bank"] = 0xFFF,
-        ["data"] = "",
-        ["align"] = 16
-    }
 
     -- Parse ELF.
     if #elf.phdr > 0 then
@@ -389,15 +427,34 @@ local function romlink_run(args, linker_args)
                     section_entry.align = 2
                 end
                 if not apply_section_name_to_entry(section_entry) then
+                    -- wgate: support putting .fardata in SRAM
                     if stringx.startswith(section_name, ".fartext")
-                    or stringx.startswith(section_name, ".farrodata") then
-                        section_entry.type = 2
-                        section_entry.bank = 0xFFF
+                    or stringx.startswith(section_name, ".farrodata")
+                    or (stringx.startswith(section_name, ".fardata") and near_section.type == wfallocator.SRAM) then
+                        if far_sections_supported then
+                            section_entry.type = default_alloc_type
+                            section_entry.bank = default_alloc_bank
+                        else
+                            section_entry.segment = near_section
+                            section_entry.segment_offset = #near_section.data
+                            near_section.data = near_section.data .. data
+                        end
                     elseif stringx.startswith(section_name, ".text")
-                    or section_name == ".start" then
+                    or stringx.startswith(section_name, ".rodata") then
+                        -- append at end
                         section_entry.segment = near_section
                         section_entry.segment_offset = #near_section.data
                         near_section.data = near_section.data .. data
+                    elseif section_name == ".start" then
+                        -- append at beginning
+                        section_entry.segment = near_section
+                        section_entry.segment_offset = 0
+                        near_section.data = data .. near_section.data
+                        for i,v in pairs(sections) do
+                            if v.segment == near_section then
+                                v.segment_offset = v.segment_offset + #data
+                            end
+                        end
                     else
                         section_entry.type = wfallocator.IRAM
                     end
@@ -572,15 +629,15 @@ local function romlink_run(args, linker_args)
     local iram = allocator.banks[wfallocator.IRAM][1]
     local iram_entry = {
         ["name"] = "(wf) ROM -> IRAM copy",
-        ["type"] = 2,
-        ["bank"] = 0xFFF,
+        ["type"] = default_alloc_type,
+        ["bank"] = default_alloc_bank,
         ["align"] = 2
     }
     iram_entry.data = build_iram_data(iram)
     allocator:add(iram_entry)
     allocator:allocate(allocator_config, false)
 
-    local heap_start, heap_length = iram:find_gap(0, 0x3FFF, true)
+    local heap_start, heap_length = iram:find_gap(0, 0x4000, true)
     emit_symbol(symbols_by_name, "__wf_heap_start", heap_start)
     emit_symbol(symbols_by_name, "__wf_heap_top", heap_start + heap_length)
     emit_symbol(symbols_by_name, "__wf_data_block", entry_plus_offset(iram_entry, 0), entry_plus_offset(iram_entry, 0) & 0xFFFF0, iram_entry)
@@ -644,63 +701,81 @@ local function romlink_run(args, linker_args)
     -- Copy IRAM data to ROM.
     iram_entry.data = build_iram_data(iram)
     -- Check if no data is attmepted to be written in SRAM.
-    for i, bank in pairs(allocator.banks[wfallocator.SRAM]) do
-        for j, entry in pairs(bank.entries) do
-            if not entry.empty then
-                error("unsupported: symbol " .. (entry.name or "???") .. " in SRAM contains data")
+    if platform.mode == "cartridge" then
+        for i, bank in pairs(allocator.banks[wfallocator.SRAM]) do
+            for j, entry in pairs(bank.entries) do
+                if not entry.empty then
+                    error("unsupported: symbol " .. (entry.name or "???") .. " in SRAM contains data")
+                end
             end
         end
     end
 
-    local linear, segment, offset = get_linear_logical_address(start_symbol)
-    config.cartridge.start_segment = segment
-    config.cartridge.start_offset = offset
-
+    -- Finalize allocation.
     for i, v in pairs(sections) do
         if v.segment ~= nil then
             v.segment.data = wfnative.replace(v.segment.data, v.data, v.segment_offset + 1)
         end
     end
-
-    -- Final ROM allocation, calculate size.
     allocator:allocate(allocator_config, true)
-    local allocated_rom_bank_count = allocator.bank_sizes[0].count
-    local allocated_rom_bank_offset = allocator.banks[0][allocator.bank_sizes[0].first]:allocation_start()
-    local rom_bank_type, rom_bank_count = romlink_calc_rom_size(config.cartridge.rom_banks or allocator.bank_sizes[0].count)
+
+    local allocated_rom_bank_count = allocator.bank_sizes[0].count or 0
+    local allocated_rom_bank_offset = 0
+    if allocator.bank_sizes[0].first ~= nil then
+        allocator.banks[0][allocator.bank_sizes[0].first]:allocation_start()
+    end
+    local rom_bank_type, rom_bank_count = romlink_calc_rom_size(config.cartridge.rom_banks or allocator.bank_sizes[0].count or 0)
     local rom_bank_first = 65536 - rom_bank_count
     local rom_size_bytes = rom_bank_count * 0x10000
-    config.cartridge.rom_size = rom_bank_type
 
-    local rom_pad_byte = 0xFF
-    local rom_pad_char = string.char(rom_pad_byte)
-    
-    -- Calculate checksum.
-    local checksum = 0
-    local bytes_read = 0
-    for i, bank in pairs(allocator.banks[0]) do
-        for j, entry in pairs(bank.entries) do
-            checksum = wswan.calculate_rom_checksum(checksum, entry.data)
-            bytes_read = bytes_read + #entry.data
+    -- Build data.
+    if platform.mode == "cartridge" then
+        local linear, segment, offset = get_linear_logical_address(start_symbol)
+        config.cartridge.start_segment = segment
+        config.cartridge.start_offset = offset
+        config.cartridge.rom_size = rom_bank_type
+
+        local rom_pad_byte = 0xFF
+        local rom_pad_char = string.char(rom_pad_byte)
+        
+        -- Calculate checksum.
+        local checksum = 0
+        local bytes_read = 0
+        for i, bank in pairs(allocator.banks[0]) do
+            for j, entry in pairs(bank.entries) do
+                checksum = wswan.calculate_rom_checksum(checksum, entry.data)
+                bytes_read = bytes_read + #entry.data
+            end
         end
-    end
-    checksum = wswan.calculate_rom_checksum(checksum, wswan.calculate_rom_padding_checksum(rom_pad_byte, rom_size_bytes - bytes_read))
-    rom_header.data = wswan.create_rom_header(checksum, config.cartridge)
+        checksum = wswan.calculate_rom_checksum(checksum, wswan.calculate_rom_padding_checksum(rom_pad_byte, rom_size_bytes - bytes_read))
+        rom_header.data = wswan.create_rom_header(checksum, config.cartridge)
 
-    -- Build ROM.
-    local rom_file <close> = io.open(args.output, "wb")
-    local min_position = 0
-    if args.trim then
-        min_position = (rom_bank_count - allocated_rom_bank_count) * 0x10000 + allocated_rom_bank_offset
-    end
-    for i=1,(rom_size_bytes - min_position) do
-        rom_file:write(rom_pad_char)
-    end
-    for i, bank in pairs(allocator.banks[0]) do
-        for j, entry in pairs(bank.entries) do
-            local offset = ((entry.bank - rom_bank_first) * 0x10000 + entry.offset) - min_position
+        -- Build ROM.
+        local rom_file <close> = io.open(args.output, "wb")
+        local min_position = 0
+        if args.trim then
+            min_position = (rom_bank_count - allocated_rom_bank_count) * 0x10000 + allocated_rom_bank_offset
+        end
+        for i=1,(rom_size_bytes - min_position) do
+            rom_file:write(rom_pad_char)
+        end
+        for i, bank in pairs(allocator.banks[0]) do
+            for j, entry in pairs(bank.entries) do
+                local offset = ((entry.bank - rom_bank_first) * 0x10000 + entry.offset) - min_position
+                rom_file:seek("set", offset)
+                rom_file:write(entry.data)
+            end
+        end
+    elseif platform.mode == "wgate" then
+        -- Build binary.
+        local rom_file <close> = io.open(args.output, "wb")
+        for i, entry in pairs(allocator.banks[wfallocator.SRAM][0].entries) do
+            local offset = entry.offset - 0x10
             rom_file:seek("set", offset)
             rom_file:write(entry.data)
         end
+    else
+        error("unsupported mode: " .. platform.mode)
     end
 
     -- Build relocated ELF.
@@ -816,19 +891,39 @@ local function romlink_run(args, linker_args)
     end
 end
 
+local args_doc = [[
+    -c,--config   (optional string)  Configuration file name;
+                                     wfconfig.toml is used by default.
+    -o,--output   (string)           Output file name.
+    --output-elf  (optional string)  Output ELF file name; stored on request.
+    --disable-gc                     Disable section garbage collection.
+    -v,--verbose                     Enable verbose logging.
+    <input>       (string)           Input ELF file.
+]]
+
 return {
-    ["arguments"] = [[
+    ["rom"] = {
+        ["arguments"] = [[
 [args...] <input>: convert an ELF file to a wswan ROM
-  -c,--config   (optional string)  Configuration file name;
-                                   wfconfig.toml is used by default.
-  -o,--output   (string)           Output ROM file name.
-  --output-elf  (optional string)  Output ELF file name; stored on request.
-  --disable-gc                     Disable section garbage collection.
-  --trim                           Trim the assembled ROM by removing unused
-                                   space from the beginning of the file.
-  -v,--verbose                     Enable verbose logging.
-  <input>       (string)           Input ELF file.
-]],
-    ["description"] = "convert an ELF file to a wswan ROM",
-    ["run"] = romlink_run
+    --trim                           Trim the assembled ROM by removing unused
+                                     space from the beginning of the file.
+]] .. args_doc,
+        ["description"] = "convert an ELF file to a wswan ROM",
+        ["run"] = function(args)
+            return run_linker(args, {
+                ["mode"] = "cartridge"
+            })
+        end
+    },
+    ["wgate"] = {
+        ["arguments"] = [[
+[args...] <input>: convert an ELF file to a wgate executable
+]] .. args_doc,
+        ["description"] = "convert an ELF file to a wgate executable",
+        ["run"] = function(args)
+            return run_linker(args, {
+                ["mode"] = "wgate"
+            })
+        end
+    }
 }
