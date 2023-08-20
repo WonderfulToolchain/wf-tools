@@ -234,7 +234,7 @@ local function apply_section_name_to_entry(entry)
         end
         entry.type = stype
         if sempty ~= nil then entry.empty = sempty end
-        return true
+        return true, stype < 0
     else
         return false
     end
@@ -357,6 +357,9 @@ local function run_linker(args, platform)
 
         default_alloc_type = wfallocator.SRAM
         default_alloc_bank = 0
+
+        -- TODO: Set to false once near_section supports garbage collection
+        far_sections_supported = true
     else
         error("unsupported platform: " .. platform.mode)
     end
@@ -426,7 +429,8 @@ local function run_linker(args, platform)
                 elseif #data >= 2 then
                     section_entry.align = 2
                 end
-                if not apply_section_name_to_entry(section_entry) then
+                local is_custom_section_name, is_force_retain = apply_section_name_to_entry(section_entry)
+                if not is_custom_section_name then
                     -- wgate: support putting .fardata in SRAM
                     if stringx.startswith(section_name, ".fartext")
                     or stringx.startswith(section_name, ".farrodata")
@@ -461,7 +465,7 @@ local function run_linker(args, platform)
                     if (shdr.flags & wfelf.SHF_GNU_RETAIN) ~= 0 then
                         retained_sections[section_entry.input_index] = true
                     end
-                else
+                elseif is_force_retain then
                     retained_sections[section_entry.input_index] = true
                 end
                 if #data > 0xFFF0 then
