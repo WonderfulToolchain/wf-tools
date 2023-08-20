@@ -103,7 +103,7 @@ local function get_linear_logical_address(symbol, offset)
     offset = offset or 0
     local linear = get_linear_address(symbol)
     local segment
-    if symbol[1] ~= nil and symbol[1].segment ~= nil then
+    if symbol[1] ~= nil and symbol[1].segment ~= nil and symbol[1].segment.type ~= wfallocator.IRAM then
         segment = entry_plus_offset(symbol[1].segment, 0)
     elseif symbol[1] ~= nil and (symbol[1].type == 2 or symbol[1].type == -1) then
         segment = (linear & 0xFFFF0)
@@ -256,8 +256,9 @@ end
 -- - flags: 2 bytes
 --   - 0x8000: followed by data if true, not followed by data if false
 -- Cap size at 65520 bytes.
-local function build_iram_data_push(data, joined_entry)
+local function build_iram_data_push(data, joined_entry, platform)
     if joined_entry == nil then return data end
+    if platform.mode == "bfb" and (not joined_entry.empty) then return data end
 
     local length = #joined_entry.data
     local offset = joined_entry.offset
@@ -266,12 +267,14 @@ local function build_iram_data_push(data, joined_entry)
 
     data = data .. string.char(length & 0xFF) .. string.char((length >> 8) & 0xFF)
     data = data .. string.char(offset & 0xFF) .. string.char((offset >> 8) & 0xFF)
-    data = data .. string.char(flags & 0xFF) .. string.char((flags >> 8) & 0xFF)
+    if platform.mode ~= "bfb" then
+        data = data .. string.char(flags & 0xFF) .. string.char((flags >> 8) & 0xFF)
+    end
     if not joined_entry.empty then data = data .. joined_entry.data end
     return data
 end
 
-local function build_iram_data(iram)
+local function build_iram_data(iram, platform)
     local data = ""
     local joined_entry = nil
 
@@ -284,14 +287,14 @@ local function build_iram_data(iram)
                 if v.offset == je_end_offset and (v.empty == true) == (joined_entry.empty == true) then
                     joined_entry.data = joined_entry.data .. v.data
                 else
-                    data = build_iram_data_push(data, joined_entry)
+                    data = build_iram_data_push(data, joined_entry, platform)
                     joined_entry = tablex.copy(v)
                 end
             end
         end
     end
 
-    data = build_iram_data_push(data, joined_entry)
+    data = build_iram_data_push(data, joined_entry, platform)
     data = data .. string.char(0) .. string.char(0)
     if #data > 65520 then
         error("IRAM data block too large")
@@ -324,7 +327,9 @@ local function run_linker(args, platform)
     local elf_file_root, elf_file_ext = path.splitext(args.input)
     local elf = wfelf.ELF(elf_file, wfelf.ELFCLASS32, wfelf.ELFDATA2LSB, wfelf.EM_386)
 
-    local default_alloc_type, default_alloc_bank
+    local default_alloc_type = nil
+    local default_alloc_bank = nil
+    local default_alloc_offset = nil
     local far_sections_supported = false
     local rom_header = nil
 
@@ -342,6 +347,11 @@ local function run_linker(args, platform)
 
         default_alloc_type = 2
         default_alloc_bank = 0xFFF
+        far_sections_supported = true
+    elseif platform.mode == "bfb" then
+        default_alloc_type = wfallocator.IRAM
+        default_alloc_bank = 1
+        default_alloc_offset = {0x6800, 0xFDFF}
         far_sections_supported = true
     elseif platform.mode == "wgate" then
         allocator_config.sram_size = 65536
@@ -368,6 +378,7 @@ local function run_linker(args, platform)
         ["name"] = "(wf) near section",
         ["type"] = default_alloc_type,
         ["bank"] = default_alloc_bank,
+        ["offset"] = default_alloc_offset,
         ["data"] = "",
         ["align"] = 16
     }
@@ -431,24 +442,18 @@ local function run_linker(args, platform)
                 end
                 local is_custom_section_name, is_force_retain = apply_section_name_to_entry(section_entry)
                 if not is_custom_section_name then
-                    -- wgate: support putting .fardata in SRAM
                     if stringx.startswith(section_name, ".fartext")
                     or stringx.startswith(section_name, ".farrodata")
-                    or (stringx.startswith(section_name, ".fardata") and near_section.type == wfallocator.SRAM) then
+                    or (stringx.startswith(section_name, ".fardata") and (near_section.type == wfallocator.SRAM or near_section.type == wfallocator.IRAM)) then
                         if far_sections_supported then
                             section_entry.type = default_alloc_type
                             section_entry.bank = default_alloc_bank
+                            section_entry.offset = default_alloc_offset
                         else
                             section_entry.segment = near_section
                             section_entry.segment_offset = #near_section.data
                             near_section.data = near_section.data .. data
                         end
-                    elseif stringx.startswith(section_name, ".text")
-                    or stringx.startswith(section_name, ".rodata") then
-                        -- append at end
-                        section_entry.segment = near_section
-                        section_entry.segment_offset = #near_section.data
-                        near_section.data = near_section.data .. data
                     elseif section_name == ".start" then
                         -- append at beginning
                         section_entry.segment = near_section
@@ -459,6 +464,13 @@ local function run_linker(args, platform)
                                 v.segment_offset = v.segment_offset + #data
                             end
                         end
+                    elseif stringx.startswith(section_name, ".text")
+                    or stringx.startswith(section_name, ".rodata")
+                    or (platform.mode == "bfb" and section_entry.input_alloc and data_empty == 0) then
+                        -- append at end
+                        section_entry.segment = near_section
+                        section_entry.segment_offset = #near_section.data
+                        near_section.data = near_section.data .. data
                     else
                         section_entry.type = wfallocator.IRAM
                     end
@@ -635,13 +647,22 @@ local function run_linker(args, platform)
         ["name"] = "(wf) ROM -> IRAM copy",
         ["type"] = default_alloc_type,
         ["bank"] = default_alloc_bank,
+        ["offset"] = default_alloc_offset,
         ["align"] = 2
     }
-    iram_entry.data = build_iram_data(iram)
+    if platform.mode == "bfb" then
+        iram_entry.align = 1
+    end
+    iram_entry.data = build_iram_data(iram, platform)
     allocator:add(iram_entry)
     allocator:allocate(allocator_config, false)
 
-    local heap_start, heap_length = iram:find_gap(0, 0x4000, true)
+    local heap_start, heap_length
+    if platform.mode == "bfb" then
+        heap_start, heap_length = iram:find_gap(0, 0xFE00, true)
+    else
+        heap_start, heap_length = iram:find_gap(0, 0x4000, true)
+    end
     emit_symbol(symbols_by_name, "__wf_heap_start", heap_start)
     emit_symbol(symbols_by_name, "__wf_heap_top", heap_start + heap_length)
     emit_symbol(symbols_by_name, "__wf_data_block", entry_plus_offset(iram_entry, 0), entry_plus_offset(iram_entry, 0) & 0xFFFF0, iram_entry)
@@ -703,7 +724,7 @@ local function run_linker(args, platform)
     end
 
     -- Copy IRAM data to ROM.
-    iram_entry.data = build_iram_data(iram)
+    iram_entry.data = build_iram_data(iram, platform)
     -- Check if no data is attmepted to be written in SRAM.
     if platform.mode == "cartridge" then
         for i, bank in pairs(allocator.banks[wfallocator.SRAM]) do
@@ -777,6 +798,27 @@ local function run_linker(args, platform)
             local offset = entry.offset - 0x10
             rom_file:seek("set", offset)
             rom_file:write(entry.data)
+        end
+    elseif platform.mode == "bfb" then
+        local linear, segment, offset = get_linear_logical_address(start_symbol)
+        if segment ~= 0x0000 then
+            error(string.format("unsupported: non-zero .bfb start segment [%04X:%04X]", segment, offset))
+        end
+
+        local rom_file <close> = io.open(args.output, "wb")
+        rom_file:write("bF")
+        rom_file:write(string.char(offset & 0xFF))
+        rom_file:write(string.char(offset >> 8))
+        for i, entry in pairs(allocator.banks[wfallocator.IRAM][1].entries) do
+            local offset = entry.offset - offset
+            local is_empty = is_string_empty(entry.data)
+            if offset < 0 and not is_empty then
+                error("unsupported: non-empty entry outside of data region")
+            end
+            if not is_empty then
+                rom_file:seek("set", offset + 4)
+                rom_file:write(entry.data)
+            end
         end
     else
         error("unsupported mode: " .. platform.mode)
@@ -906,6 +948,17 @@ local args_doc = [[
 ]]
 
 return {
+    ["bfb"] = {
+        ["arguments"] = [[
+[args...] <input>: convert an ELF file to a BootFriend executable
+]] .. args_doc,
+        ["description"] = "convert an ELF file to a BootFriend executable",
+        ["run"] = function(args)
+            return run_linker(args, {
+                ["mode"] = "bfb"
+            })
+        end
+    },
     ["rom"] = {
         ["arguments"] = [[
 [args...] <input>: convert an ELF file to a wswan ROM

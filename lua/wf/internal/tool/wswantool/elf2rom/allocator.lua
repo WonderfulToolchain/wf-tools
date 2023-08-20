@@ -122,9 +122,20 @@ function Bank:try_place(entry, simulate)
     if #entry.data > self.size then
         return false
     end
+    local eoffset_min = 0
+    local eoffset_max = self.size
+    if entry.offset ~= nil then
+        if type(entry.offset) == "table" then
+            eoffset_min = math.max(eoffset_min, entry.offset[1])
+            eoffset_max = math.min(eoffset_max, entry.offset[2] + 1)
+        else
+            eoffset_min = entry.offset
+            eoffset_max = entry.offset + #entry.data
+        end
+    end
 
     if self:is_empty() then
-        local eoffset = entry.offset or calc_eoffset(0, self.size, #entry.data, self.descending, entry.align)
+        local eoffset = calc_eoffset(eoffset_min, eoffset_max, #entry.data, self.descending, entry.align)
         if not simulate then
             entry.offset = eoffset
             table.insert(self.entries, entry)
@@ -132,18 +143,6 @@ function Bank:try_place(entry, simulate)
         return true, eoffset
     else
         -- TODO: Merge adjacent entries.
-        local eoffset_min = 0
-        local eoffset_max = self.size
-        if entry.offset ~= nil then
-            if type(entry.offset) == "table" then
-                eoffset_min = math.max(eoffset_min, entry.offset[1])
-                eoffset_max = math.min(eoffset_max, entry.offset[2] + 1)
-            else
-                eoffset_min = entry.offset
-                eoffset_max = entry.offset + #entry.data
-            end
-        end
-
         local previous = self.entries[1]
 
         local gap_start = eoffset_min
