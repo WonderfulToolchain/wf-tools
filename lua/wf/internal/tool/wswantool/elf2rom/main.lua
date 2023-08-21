@@ -57,7 +57,7 @@ end
 
 local function vma_entry_plus_offset(entry, offset)
     local logical_address = entry_plus_offset(entry, offset)
-    if entry.type >= -2 then
+    if entry.type >= -2 and entry.bank ~= nil then
         logical_address = logical_address | ((entry.bank & 0xFFF) << 20)
     end
     return logical_address
