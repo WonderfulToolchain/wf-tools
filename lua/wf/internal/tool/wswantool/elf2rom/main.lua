@@ -314,14 +314,11 @@ local function run_linker(args, platform)
 
     local gc_enabled = not args.disable_gc
     local allocator = wfallocator.Allocator()
-    -- TODO: Valid sram_size values.
     local allocator_config = {
         ["iram_size"] = 65536,
         ["sram_size"] = 0,
         ["rom_banks"] = 0
     }
-    if platform.mode == "cartridge" then
-    end
 
     local elf_file <close> = io.open(args.input, "rb")
     local elf_file_root, elf_file_ext = path.splitext(args.input)
@@ -335,6 +332,11 @@ local function run_linker(args, platform)
 
     if platform.mode == "cartridge" then
         allocator_config.rom_banks = config.cartridge.rom_banks
+       
+        local save_type = wswan.get_save_type(config.cartridge)
+        if save_type ~= nil then
+            allocator_config.sram_size = wswan.SRAM_SIZE_BY_TYPE[save_type] or 0
+        end
         
         rom_header = {
             ["name"] = "(wf) ROM header",

@@ -47,6 +47,22 @@ M.SAVE_TYPES_BY_NAME = {
     ["EEPROM_1KB"] = 0x50 -- 1 kilobyte of EEPROM.
 }
 
+--- Map of save type IDs to SRAM sizes.
+M.SRAM_SIZE_BY_TYPE = {
+    [0x01] = 8192,
+    [0x02] = 32768,
+    [0x03] = 131072,
+    [0x04] = 262144,
+    [0x05] = 524288
+}
+
+--- Map of save type IDs to EEPROM sizes.
+M.EEPROM_SIZE_BY_TYPE = {
+    [0x10] = 128,
+    [0x20] = 2048,
+    [0x50] = 1024
+}
+
 --- Fast method to calculate the ROM checksum for a repeated byte.
 -- @tparam number pad The padding byte value.
 -- @tparam number count The number of occurences of the given byte.
@@ -84,6 +100,14 @@ function M.calculate_rom_checksum(...)
     return checksum, bytes_read
 end
 
+function M.get_save_type(settings)
+    if type(settings.save_type) == "number" then
+        return settings.save_type
+    else
+        return M.SAVE_TYPES_BY_NAME[settings.save_type or "NONE"]
+    end
+end
+
 --- Create a ROM header for the specified checksum and settings.
 -- @tparam number checksum The checksum for the ROM, excluding the header.
 -- @tparam table settings The settings.
@@ -95,7 +119,9 @@ function M.create_rom_header(checksum, settings)
     end
 
     local color = 0x00
-    if settings.color then
+    if type(settings.color) == "number" then
+        color = settings.color
+    elseif settings.color then
         color = 0x01
     end
 
@@ -148,7 +174,7 @@ function M.create_rom_header(checksum, settings)
         error("invalid mapper value")
     end
 
-    local save_type = M.SAVE_TYPES_BY_NAME[settings.save_type or "NONE"]
+    local save_type = M.get_save_type(settings)
     if save_type == nil then
         error("invalid save type value")
     end
