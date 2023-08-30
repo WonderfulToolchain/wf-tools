@@ -263,14 +263,14 @@ local function build_iram_data_push(data, joined_entry, platform)
     local length = #joined_entry.data
     local offset = joined_entry.offset
     local flags = 0
-    if joined_entry.empty then flags = flags | 0x8000 end
+    if joined_entry.empty > 0 then flags = flags | 0x8000 end
 
     data = data .. string.char(length & 0xFF) .. string.char((length >> 8) & 0xFF)
     data = data .. string.char(offset & 0xFF) .. string.char((offset >> 8) & 0xFF)
     if platform.mode ~= "bfb" then
         data = data .. string.char(flags & 0xFF) .. string.char((flags >> 8) & 0xFF)
     end
-    if not joined_entry.empty then data = data .. joined_entry.data end
+    if joined_entry.empty <= 0 then data = data .. joined_entry.data end
     return data
 end
 
@@ -731,7 +731,7 @@ local function run_linker(args, platform)
     if platform.mode == "cartridge" then
         for i, bank in pairs(allocator.banks[wfallocator.SRAM]) do
             for j, entry in pairs(bank.entries) do
-                if not entry.empty then
+                if entry.empty == 0 then
                     error("unsupported: symbol " .. (entry.name or "???") .. " in SRAM contains data")
                 end
             end
