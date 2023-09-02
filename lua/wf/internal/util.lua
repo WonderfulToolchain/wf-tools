@@ -27,7 +27,6 @@ M.OUTPUT_CAPTURE_BINARY = 3
 --- Execute a given command with the specified arguments.
 function M.execute(command, args, output_mode)
     local cmd = command .. " " .. utils.quote_arg(args)
-    print(cmd)
     if output_mode == 1 then
         local success, exit_type, code = os.execute(cmd)
         if exit_type ~= "exit" then

@@ -8,13 +8,23 @@
 local compat = require("pl.compat")
 local dir = require("pl.dir")
 local path = require("pl.path")
+local stringx = require("pl.stringx")
+local wfutil = require("wf.internal.util")
 local M = {}
 
 local dir_separator = compat.dir_separator
 local base_dir, executable_extension
 if compat.is_windows then
     executable_extension = '.exe'
-    base_dir = '/opt/wonderful'
+    local bd_success, bd_error_code
+    bd_success, bd_error_code, base_dir = wfutil.execute(
+        "cygpath", {"-w", "/opt/wonderful"},
+        wfutil.OUTPUT_CAPTURE
+    )
+    if not bd_success then
+        error("could not retrieve toolchain directory")
+    end
+    base_dir = stringx.strip(base_dir)
 else
     executable_extension = ''
     base_dir = '/opt/wonderful'

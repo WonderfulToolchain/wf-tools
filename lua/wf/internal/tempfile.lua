@@ -35,7 +35,7 @@ M.create_directory = function(auto_remove)
     local dirname
     if compat.is_windows then
         dirname = os.tmpname()
-        local mkdir_success, mkdir_error = path.mkdir(result.name)
+        local mkdir_success, mkdir_error = path.mkdir(dirname)
         if not mkdir_success then
             error("could not create temporary directory: " .. mkdir_error)
         end
