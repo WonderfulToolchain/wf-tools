@@ -10,7 +10,7 @@
 int main(int argc, char **argv) {
 	if (argc < 2) return 1;
 
-	FILE *outf = fopen(argv[1], "w");
+	FILE *outf = fopen(argv[1], "wb");
 	if (outf == NULL) return 1;
 
 	fprintf(outf, "[");
@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
 	bool buffervalid = false;
 
 	for (int i = 2; i < argc; i++) {
-		FILE *inf = fopen(argv[i], "r");
+		FILE *inf = fopen(argv[i], "rb");
 		if (inf == NULL) continue;
 
 		if (buffervalid) {
