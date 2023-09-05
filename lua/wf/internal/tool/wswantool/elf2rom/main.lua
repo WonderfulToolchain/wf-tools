@@ -467,7 +467,6 @@ local function run_linker(args, platform)
                             end
                         end
                     elseif stringx.startswith(section_name, ".text")
-                    or stringx.startswith(section_name, ".rodata")
                     or (platform.mode == "bfb" and section_entry.input_alloc and data_empty == 0) then
                         -- append at end
                         section_entry.segment = near_section
