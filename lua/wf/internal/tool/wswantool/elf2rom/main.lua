@@ -284,7 +284,7 @@ local function build_iram_data(iram, platform)
                 joined_entry = tablex.copy(v)
             else
                 local je_end_offset = joined_entry.offset + #joined_entry.data
-                if v.offset == je_end_offset and (v.empty == true) == (joined_entry.empty == true) then
+                if v.offset == je_end_offset and (v.empty > 0) == (joined_entry.empty > 0) then
                     joined_entry.data = joined_entry.data .. v.data
                 else
                     data = build_iram_data_push(data, joined_entry, platform)
