@@ -47,19 +47,27 @@ local function romlink_run(args, linker_args)
     end
 
     -- generate linkscript
-    local linkscript_filename = temp_dir:path("link.ld")
-    local linkscript_file = io.open(linkscript_filename, "w")
-    rom_write_linkscript(linkscript_file, parent_filename, config)
-    linkscript_file:close()
+    local linkscript_filename = args.script
+    if linkscript_filename == nil then
+        linkscript_filename = temp_dir:path("link.ld")
+        local linkscript_file = io.open(linkscript_filename, "w")
+        rom_write_linkscript(linkscript_file, parent_filename, config)
+        linkscript_file:close()
+    end
 
     -- run "arm-none-eabi-ld", "arm-none-eabi-objcopy"
     romlink_call_linker(linkscript_filename, args.output_elf or temp_dir:path("a.out.elf"), args.output, linker_args)
 
     -- run "wf-gbatool fix"
-    -- TODO: remove .gba file if this fails
     local tool_fix_args = tablex.copy(args)
     tool_fix_args.input_file = args.output
-    tool_fix.run(tool_fix_args)
+    local tool_fix_success, tool_fix_error = pcall(function()
+        tool_fix.run(tool_fix_args)
+    end)
+    if not tool_fix_success then
+        os.remove(args.output)
+        error(tool_fix_error)
+    end
 end
 
 return {
@@ -70,6 +78,9 @@ return {
   -o,--output   (string)           Output ROM file name.
   --output-elf  (optional string)  Output ELF file name;
                                    only stored on request.
+  -T,--script   (optional string)  Custom link script to use.
+                                   This disables generated link script
+                                   functionality.
   -v,--verbose                     Enable verbose logging.
   <subtarget>   (string)           Subtarget: "rom" or "multiboot".
 ]],
