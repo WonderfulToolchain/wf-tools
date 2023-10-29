@@ -4,6 +4,7 @@
 
 commands = {}
 commands.fix = require('wf.internal.tool.gbatool.fix')
+commands.link = require('wf.internal.tool.gbatool.link')
 commands.project = require('wf.internal.tool.project')('gba')
 
 require('wf.internal.tool')

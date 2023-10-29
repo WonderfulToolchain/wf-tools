@@ -30,7 +30,7 @@ local function gbafix_run(args)
     end
 
     local rom_filename = args.input_file
-    if args.output then
+    if args.output and path.normpath(args.output) ~= path.normpath(args.input_file) then
         if not dir.copyfile(args.input_file, args.output) then
             error("could not create file: " .. args.output)
         end
