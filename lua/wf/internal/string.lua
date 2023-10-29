@@ -8,6 +8,23 @@
 local iconv = require("iconv")
 local M = {}
 
+--- Pad a string to a specific length, padded by a specific character.
+-- This will both truncate and expand the string.
+-- @tparam string value The string to pad.
+-- @tparam number vlen The expected length.
+-- @tparam ?number pad_char The padding character, \0 by default.
+-- @treturn string The aligned value.
+function M.pad_to_length(value, vlen, pad_char)
+    if #value == vlen then
+        return value
+    elseif #value > vlen then
+        return value:sub(1, vlen)
+    else
+        local bytes_to_append = vlen - #value
+        return value .. (pad_char or string.char(0)):rep(bytes_to_append)
+    end  
+end
+
 --- Convert a string to an encoded binary buffer.
 -- @tparam string s The string to convert.
 -- @tparam string to Target encoding.
