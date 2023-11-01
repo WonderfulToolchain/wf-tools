@@ -4,7 +4,7 @@
 local path = require('pl.path')
 local tablex = require('pl.tablex')
 local utils = require('pl.utils')
-local toml = require('toml')
+local toml = require('wf.internal.toml')
 local wfmath = require('wf.internal.math')
 local wfoverlaylist = require('wf.internal.overlay_list')
 local wfpath = require('wf.internal.path')
@@ -109,7 +109,12 @@ SECTIONS {
 end
 
 local function romlink_run(args, linker_args)
-    local config = toml.decodeFromFile(args.config or "wfconfig.toml")
+    local config = {}
+    local config_filename = args.config or "wfconfig.toml"
+    if (args.config ~= nil) or path.exists(config_filename) then
+        local config_data = toml.decodeFromFile(config_filename)
+        config = tablex.union(config_data, config)
+    end
     local parent_filename = "link-" .. args.subtarget .. ".mem"
 
     -- generate linkscript

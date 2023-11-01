@@ -5,7 +5,7 @@ local dir = require("pl.dir")
 local path = require('pl.path')
 local tablex = require('pl.tablex')
 local utils = require('pl.utils')
-local toml = require('toml')
+local toml = require('wf.internal.toml')
 local wfpath = require('wf.internal.path')
 local wfstring = require('wf.internal.string')
 local wfutil = require('wf.internal.util')
@@ -22,7 +22,7 @@ end
 local function gbafix_run(args)
     local config = args
     local config_filename = args.config or "wfconfig.toml"
-    if path.exists(config_filename) then
+    if (args.config ~= nil) or path.exists(config_filename) then
         local config_data = toml.decodeFromFile(config_filename)
         if config_data.cartridge ~= nil then
             config = tablex.union(config_data.cartridge, config)

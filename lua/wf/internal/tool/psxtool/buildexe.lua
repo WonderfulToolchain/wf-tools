@@ -3,7 +3,7 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2019, 2023
 
 local path = require('pl.path')
-local toml = require('toml')
+local toml = require('wf.internal.toml')
 local wfelf = require('wf.internal.elf')
 local wfmath = require('wf.internal.math')
 local wfpsx = require('wf.internal.platform.psx')

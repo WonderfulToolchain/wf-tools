@@ -5,7 +5,7 @@ local path = require('pl.path')
 local stringx = require('pl.stringx')
 local tablex = require('pl.tablex')
 local utils = require('pl.utils')
-local toml = require('toml')
+local toml = require('wf.internal.toml')
 local wfelf = require('wf.internal.elf')
 local wfmath = require('wf.internal.math')
 local wfnative = require('wf.internal.native')
@@ -303,9 +303,9 @@ local function build_iram_data(iram, platform)
 end
 
 local function run_linker(args, platform)
-    local config_filename = args.config or "wfconfig.toml"
     local config = {}
-    if path.exists(config_filename) then
+    local config_filename = args.config or "wfconfig.toml"
+    if (args.config ~= nil) or path.exists(config_filename) then
         config = toml.decodeFromFile(config_filename)
     end
     if config.cartridge == nil then
