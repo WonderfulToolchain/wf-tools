@@ -76,14 +76,10 @@ elseif _WFPROCESS.target[1] == "psx" then
     bin2c_processor = function(obj)
         obj.align = obj.options.align or 4
     end
-end
-
-local default_bin2c_args = {}
-if (_WFPROCESS.target[1] == "wswan") and (_WFPROCESS.target[2] ~= "bootfriend") then
-    default_bin2c_args.address_space = "__wf_rom"
-    default_bin2c_args.align = 2
-elseif (_WFPROCESS.target[1] == "psx") then
-    default_bin2c_args.align = 4
+elseif _WFPROCESS.target[1] == "gba" then
+    bin2c_processor = function(obj)
+        obj.align = obj.options.align or 2
+    end
 end
 
 -- Build script environment.
