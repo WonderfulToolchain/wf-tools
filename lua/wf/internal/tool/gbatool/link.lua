@@ -105,6 +105,8 @@ SECTIONS {
     end
 
     f:write([[}
+
+INCLUDE link-size-symbols.ld
 ]])
 end
 
