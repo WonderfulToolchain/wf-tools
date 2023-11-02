@@ -257,7 +257,7 @@ end
 -- @tparam string input Input image data.
 -- @tparam string palette Input palette data.
 -- @tparam ?table config Configuration table.
--- @treturn string Converted raw palette data.
+-- @treturn string Converted raw tile data.
 -- @see config
 function M.tiles(input, palette, config)
     return tool_run("tiles", {["i"]=input, ["p"]=palette}, "d", config)
@@ -268,7 +268,7 @@ end
 -- @tparam string palette Input palette data.
 -- @tparam string tiles Input tile data.
 -- @tparam ?table config Configuration table.
--- @treturn string Converted raw palette data.
+-- @treturn string Converted raw map data.
 -- @see config
 function M.map(input, palette, tiles, config)
     return tool_run("map", {["i"]=input, ["p"]=palette, ["t"]=tiles}, "d", config)
