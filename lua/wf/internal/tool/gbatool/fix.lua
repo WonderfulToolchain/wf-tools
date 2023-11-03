@@ -36,7 +36,7 @@ local function gbafix_run(args)
         end
         rom_filename = args.output
     end
-    local rom <close> = io.open(rom_filename, "r+")
+    local rom <close> = io.open(rom_filename, "r+b")
     if rom == nil then
         error("could not open file: " .. rom_filename)
     end
