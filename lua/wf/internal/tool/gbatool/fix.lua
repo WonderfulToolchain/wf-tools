@@ -10,9 +10,9 @@ local wfpath = require('wf.internal.path')
 local wfstring = require('wf.internal.string')
 local wfutil = require('wf.internal.util')
 
-local function gbafix_strfield(rom, name, loc, value, vlen)
+local function gbafix_strfield(rom, name, loc, value, vlen, pad)
     if value ~= nil then
-        local s = wfstring.pad_to_length(value:upper(), vlen, " ")
+        local s = wfstring.pad_to_length(value:upper(), vlen, pad)
         print_verbose("adjusting " .. name .. " to: " .. s)
         rom:seek("set", loc)
         rom:write(string.pack("<c" .. tostring(vlen), s))
@@ -42,9 +42,9 @@ local function gbafix_run(args)
     end
 
     -- adjust config-requested fields
-    gbafix_strfield(rom, "game title", 0xA0, config.title, 12)
-    gbafix_strfield(rom, "game code", 0xAC, config.code, 4)
-    gbafix_strfield(rom, "maker code", 0xB0, config.maker, 2)
+    gbafix_strfield(rom, "game title", 0xA0, config.title, 12, string.char(0))
+    gbafix_strfield(rom, "game code", 0xAC, config.code, 4, "X")
+    gbafix_strfield(rom, "maker code", 0xB0, config.maker, 2, "0")
     if config.revision ~= nil then
         local v = tonumber(config.revision) & 0xFF
         print_verbose("adjusting game version to " .. v)
