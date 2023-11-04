@@ -60,6 +60,27 @@ function M.bin2c(c_file, h_file, program_name, entries)
                 h_file:write("#define " .. array_name .. "_bank ((size_t) &__bank_" .. array_name .. ")\n")
             end
         end
+
+        local write_data_number = nil
+        if type(data) == "string" then
+            if width == 1 then
+                write_data_number = function(i) c_file:write(string.format("0x%02X", data:byte(i))) end
+            elseif width == 2 then
+                if endian == "big" then
+                    write_data_number = function(i) c_file:write(string.format("0x%02X%02X", data:byte(i), data:byte(i + 1) or 0)) end
+                else
+                    write_data_number = function(i) c_file:write(string.format("0x%02X%02X", data:byte(i + 1) or 0, data:byte(i))) end
+                end
+            elseif width == 4 then
+                if endian == "big" then
+                    write_data_number = function(i) c_file:write(string.format("0x%02X%02X%02X%02X", data:byte(i), data:byte(i + 1) or 0, data:byte(i + 2) or 0, data:byte(i + 3) or 0)) end
+                else
+                    write_data_number = function(i) c_file:write(string.format("0x%02X%02X%02X%02X", data:byte(i + 3) or 0, data:byte(i + 2) or 0, data:byte(i + 1) or 0, data:byte(i))) end
+                end
+            end
+        else
+            write_data_number = function(i) c_file:write(string.format("%d", data[i])) end
+        end
     
         if c_file ~= nil then
             c_file:write("const " .. dtype .. " ")
@@ -77,34 +98,15 @@ function M.bin2c(c_file, h_file, program_name, entries)
             end
             c_file:write("= {");
             for i = 1, #data, width do
-                i_line = i % c_values_per_line
-                if i_line == 1 then
+                if i > 1 then
+                    c_file:write(",")
+                end
+                if (i % c_values_per_line) == 1 then
                     c_file:write("\n\t")
                 else
                     c_file:write(" ")
                 end
-                if type(data) == "string" then
-                    if width == 1 then
-                        c_file:write(string.format("0x%02X", data:byte(i)))
-                    elseif width == 2 then
-                        if endian == "big" then
-                            c_file:write(string.format("0x%02X%02X", data:byte(i), data:byte(i + 1) or 0))
-                        else
-                            c_file:write(string.format("0x%02X%02X", data:byte(i + 1) or 0, data:byte(i)))
-                        end
-                    elseif width == 4 then
-                        if endian == "big" then
-                            c_file:write(string.format("0x%02X%02X%02X%02X", data:byte(i), data:byte(i + 1) or 0, data:byte(i + 2) or 0, data:byte(i + 3) or 0))
-                        else
-                            c_file:write(string.format("0x%02X%02X%02X%02X", data:byte(i + 3) or 0, data:byte(i + 2) or 0, data:byte(i + 1) or 0, data:byte(i)))
-                        end
-                    end
-                else
-                    c_file:write(string.format("%d", data[i]))
-                end
-                if i <= (#data - width) then
-                    c_file:write(",")
-                end
+                write_data_number(i)
             end
             c_file:write("\n};\n");
         end
