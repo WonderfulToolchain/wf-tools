@@ -24,6 +24,14 @@ function execute_verbose(cmd, arg)
     end
 end
 
+function execute_verbose_or_error(cmd, arg)
+    if args.verbose then
+        return wfutil.execute_or_error(cmd, arg, wfutil.OUTPUT_SHELL, true)
+    else
+        return wfutil.execute_or_error(cmd, arg, wfutil.OUTPUT_CAPTURE, false)
+    end
+end
+
 local function args_split2(arg_table, sep)
     local sep_pos = tablex.find(arg_table, sep or "--")
     if sep_pos == nil then

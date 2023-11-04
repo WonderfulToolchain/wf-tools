@@ -16,21 +16,14 @@ local function romlink_call_linker(linklayout, constants, linkscript_name, outpu
     rom_write_linkscript(linkscript_file, linklayout, constants, rom_start, rom_length)
     linkscript_file:close()
 
-    local success, code = execute_verbose(
+    local success, code = execute_verbose_or_error(
         wfpath.executable('ia16-elf-gcc', 'toolchain/gcc-ia16-elf'),
         table.pack("-T", linkscript_filename, "-o", output_elf, linker_args)
     )
-    if not success then
-        error('ld exited with error code: ' .. code)
-    end
-
-    local success, code = execute_verbose(
+    local success, code = execute_verbose_or_error(
         wfpath.executable('ia16-elf-objcopy', 'toolchain/gcc-ia16-elf'),
         table.pack("-O", "binary", output_elf, output_file)
     )
-    if not success then
-        error('objcopy exited with error code: ' .. code)
-    end
 end
 
 local function romlink_measure_code_size(linklayout, constants, linker_args)

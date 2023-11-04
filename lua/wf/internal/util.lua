@@ -52,7 +52,7 @@ function M.execute_or_error(command, args, output_mode, verbose)
     end
     local success, code, stdout, stderr = M.execute(command, args, output_mode)
     if not success then
-        error("error executing '" .. cmd .. "': " .. code)
+        error("error executing '" .. cmd .. "': " .. code .. "\n" .. (stdout or '') .. "\n" .. (stderr or ''))
     end
     return success, code, stdout, stderr
 end

@@ -14,21 +14,14 @@ local wswan = require('wf.internal.platform.wswan')
 local tool_fix = require('wf.internal.tool.gbatool.fix')
 
 local function romlink_call_linker(linkscript_filename, output_elf, output_file, linker_args)
-    local success, code = execute_verbose(
+    local success, code = execute_verbose_or_error(
         wfpath.executable('arm-none-eabi-gcc', 'toolchain/gcc-arm-none-eabi'),
         table.pack("-T", linkscript_filename, "-o", output_elf, table.unpack(linker_args))
     )
-    if not success then
-        error('ld exited with error code: ' .. code)
-    end
-
-    local success, code = execute_verbose(
+    local success, code = execute_verbose_or_error(
         wfpath.executable('arm-none-eabi-objcopy', 'toolchain/gcc-arm-none-eabi'),
         table.pack("-O", "binary", output_elf, output_file)
     )
-    if not success then
-        error('objcopy exited with error code: ' .. code)
-    end
 end
 
 local function rom_write_linkscript_overlay(f, name, memory_name, overlays)

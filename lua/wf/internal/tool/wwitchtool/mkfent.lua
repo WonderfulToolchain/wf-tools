@@ -12,13 +12,10 @@ local wwitch = require('wf.internal.platform.wwitch')
 
 local function mkfent_elf_to_binary(in_filename)
     local tmp_filename = os.tmpname()
-    local success, code = execute_verbose(
+    local success, code = execute_verbose_or_error(
         wfpath.executable('ia16-elf-objcopy', 'toolchain/gcc-ia16-elf'),
         table.pack("-O", "binary", in_filename, tmp_filename)
     )
-    if not success then
-        error('objcopy exited with error code: ' .. code)
-    end
     return tmp_filename
 end
 
