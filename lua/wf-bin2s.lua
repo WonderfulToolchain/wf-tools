@@ -1,6 +1,6 @@
 #!/opt/wonderful/bin/wf-lua
 -- SPDX-License-Identifier: MIT
--- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
+-- SPDX-FileContributor: Adrian "asie" Siekierka, 2023, 2024
 
 local lfs = require('lfs')
 local lapp = require('pl.lapp')
@@ -13,9 +13,9 @@ local wfutil = require('wf.internal.util')
 ---- Program
 
 local args = lapp [[
-wf-bin2c: convert binary file to .c/.h file pair
+wf-bin2s: convert binary file to .s/.h file pair
   -a,--align      (optional number)   Data alignment.
-  --address-space (optional string)   Address space (for wswan target).
+  --section       (optional string)   Section.
   <output_dir>    (string)            Output directory.
   <input_file>    (string)            Input binary file (use '-' for stdin).
   <array_name>    (optional string)   Array name.
@@ -57,10 +57,10 @@ end
 local input_data = input_file:read("*all")
 input_file:close()
 
-local c_file <close> = lapp.open(output_path .. ".c", "w")
+local c_file <close> = lapp.open(output_path .. ".s", "w")
 local h_file <close> = lapp.open(output_path .. ".h", "w")
 
-wfbin2c.bin2c(c_file, h_file, "wf-bin2c", {
+wfbin2c.bin2s(c_file, h_file, "wf-bin2c", {
   [array_name] = {
     ["address_space"]=args.address_space,
     ["align"]=args.align,

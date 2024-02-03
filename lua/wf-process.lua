@@ -251,7 +251,7 @@ path.chdir(old_cwd)
 -- Emit output files.
 if format == ".c" then
     local process = require("wf.api.v1.process")
-    local wfbin2c = require("wf.internal.bin2c")
+    local wfbin2c = require("wf.internal.bin2gnu")
     local all_bin2c_entries = {}
 
     -- Emit header files.
