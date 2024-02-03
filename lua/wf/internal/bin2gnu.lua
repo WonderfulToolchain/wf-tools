@@ -90,7 +90,7 @@ local function bin2cs(c_file, h_file, program_name, entries, write_asm)
         if c_file ~= nil then
             if write_asm then
                 local section = entry.section or ".rodata"
-                c_file:write("\t.section " .. section .. "\n")
+                c_file:write("\t.section " .. section .. ", \"a\"\n")
                 if entry.align then
                     c_file:write("\t.balign " .. entry.align .. "\n")
                 end
