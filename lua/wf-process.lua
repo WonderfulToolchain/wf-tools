@@ -51,12 +51,16 @@ local bin2c_processor = function(obj) end
 
 if _WFPROCESS.target[1] == "wswan" then
     bin2c_processor = function(obj, key)
+        local section = ""
         if _WFPROCESS.target[2] ~= "bootfriend" then
             obj.align = obj.options.align or 2
             obj.address_space = "__wf_rom"
+            if _WFPROCESS.format == ".s" then
+                section = ".farrodata"
+            end
             if obj.options.section == nil
             and (obj.options.bank == 0 or obj.options.bank == 1 or obj.options.bank == "0" or obj.options.bank == "1" or obj.options.bank == "L") then
-                local section = ".rom" .. obj.options.bank
+                section = ".rom" .. obj.options.bank
                 if obj.options.bank_index ~= nil then
                     local index = obj.options.bank_index
                     if type(index) == "number" then index = string.format("%X", index) end
@@ -68,8 +72,14 @@ if _WFPROCESS.target[1] == "wswan" then
                     end
                 end
                 obj.bank = true
-                obj.section = section .. ".a." .. key
             end
+        else
+            if _WFPROCESS.format == ".s" then
+                section = ".rodata"
+            end
+        end
+        if section ~= "" then
+            obj.section = section .. ".a." .. key
         end
     end
 elseif _WFPROCESS.target[1] == "psx" then
@@ -173,13 +183,15 @@ local sname = path.splitext(path.basename(spath))
 local scwd = path.normpath(path.join(spath, ".."))
 local ocwd = path.normpath(path.join(args.output, ".."))
 local soutput, format = path.splitext(args.output)
+format = format:lower()
+_WFPROCESS.format = format
 
 senv.args = args.args
 
 if args.filesystem then
     _WFPROCESS.filesystem = {}
 end
-if format == ".c" then
+if format == ".c" or format == ".s" then
     local soutbase = path.splitext(path.basename(soutput))
     _WFPROCESS.bin2c_default_header = soutbase .. ".h"
     _WFPROCESS.bin2c_default_prefix = args.symbol_prefix or ""
@@ -249,7 +261,7 @@ script_func()
 path.chdir(old_cwd)
 
 -- Emit output files.
-if format == ".c" then
+if format == ".c" or format == ".s" then
     local process = require("wf.api.v1.process")
     local wfbin2c = require("wf.internal.bin2gnu")
     local all_bin2c_entries = {}
@@ -268,8 +280,13 @@ if format == ".c" then
         wfbin2c.bin2c(nil, h_file, "wf-process", bin2c_entries)
     end
 
-    local c_file <close> = io.open(soutput .. ".c", "w")
-    wfbin2c.bin2c(c_file, nil, "wf-process", all_bin2c_entries)
+    if format == ".s" then
+        local s_file <close> = io.open(soutput .. ".s", "w")
+        wfbin2c.bin2s(s_file, nil, "wf-process", all_bin2c_entries)
+    else
+        local c_file <close> = io.open(soutput .. ".c", "w")
+        wfbin2c.bin2c(c_file, nil, "wf-process", all_bin2c_entries)
+    end
 end
 
 -- Emit dependency file.
