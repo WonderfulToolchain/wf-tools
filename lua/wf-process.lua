@@ -81,6 +81,7 @@ if _WFPROCESS.target[1] == "wswan" then
         if section ~= "" then
             obj.section = section .. ".a." .. key
         end
+        obj.hide_size_from_header = #(obj.data) > 32767
     end
 elseif _WFPROCESS.target[1] == "psx" then
     bin2c_processor = function(obj)

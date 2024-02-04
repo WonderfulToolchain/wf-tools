@@ -59,7 +59,11 @@ local function bin2cs(c_file, h_file, program_name, entries, write_asm)
             if entry.address_space then
                 h_file:write(entry.address_space .. " ")
             end
-            h_file:write(array_name .. "[" .. #data .. "];\n")
+            if entry.hide_size_from_header then
+                h_file:write(array_name .. "[];\n")
+            else
+                h_file:write(array_name .. "[" .. #data .. "];\n")
+            end
             if entry.bank then
                 h_file:write("extern const void *__bank_" .. array_name .. ";\n")
                 h_file:write("#define " .. array_name .. "_bank ((size_t) &__bank_" .. array_name .. ")\n")
