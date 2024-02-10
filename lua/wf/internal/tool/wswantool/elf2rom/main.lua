@@ -748,7 +748,7 @@ local function run_linker(args, platform)
     local allocated_rom_bank_count = allocator.bank_sizes[0].count or 0
     local allocated_rom_bank_offset = 0
     if allocator.bank_sizes[0].first ~= nil then
-        allocator.banks[0][allocator.bank_sizes[0].first]:allocation_start()
+        allocated_rom_bank_offset = allocator.banks[0][allocator.bank_sizes[0].first]:allocation_start()
     end
     local rom_bank_type, rom_bank_count = romlink_calc_rom_size(config.cartridge.rom_banks or allocator.bank_sizes[0].count or 0)
     local rom_bank_first = 65536 - rom_bank_count
