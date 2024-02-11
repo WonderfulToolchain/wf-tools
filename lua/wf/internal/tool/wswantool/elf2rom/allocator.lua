@@ -451,31 +451,43 @@ local function get_offset_for_compare(offset)
     return 0
 end
 
+local function init_banks(config)
+    local banks = {}
+    banks[-3] = {Bank(config.iram_size or 65536, false)} -- IRAM
+    banks[-2] = {}  -- SRAM
+    banks[0] = {}   -- ROM (0/1)
+    banks[2] = {}   -- ROM (linear)
+
+    local sram_size = config.sram_size or 0
+    for i=0,sram_size,65536 do
+        banks[-2][i] = Bank(math.min(65536, sram_size - i), false)
+    end
+
+    local rom_last_bank = config.rom_last_bank or 65535
+    local max_bank_count = config.rom_banks
+    if max_bank_count == nil then
+        max_bank_count = rom_last_bank + 1
+        if max_bank_count > 128 then max_bank_count = 128 end
+    end
+    for i=0,max_bank_count-1 do
+        local b = Bank(65536, true)
+        local bidx = rom_last_bank - i
+        banks[0][bidx] = b
+        -- linear bank mapping
+        if ((bidx & 0xF) >= 0x4) then
+            banks[2][bidx] = b
+        end
+    end
+
+    banks[1] = banks[0]
+    banks[-1] = banks[0]
+    return banks
+end
+
 function Allocator:allocate(config, is_final)
     local banks = self.banks
     if banks == nil then
-        banks = {}
-        banks[-3] = {Bank(config.iram_size or 65536, false)} -- IRAM
-        banks[-2] = {} -- SRAM
-        banks[0] = {}
-        banks[2] = {}
-
-        local sram_size = config.sram_size or 0
-        for i=0,sram_size,65536 do
-            banks[-2][i] = Bank(math.min(65536, sram_size - i), false)
-        end
-
-        local max_bank_count = config.rom_banks or 128
-        for i=0,max_bank_count-1 do
-            local b = Bank(65536, true)
-            banks[0][65535 - i] = b
-            if ((i & 0xF) < 0xC) then
-                banks[2][65535 - i] = b
-            end
-        end
-
-        banks[1] = banks[0]
-        banks[-1] = banks[0]
+        banks = init_banks(config)
     end
 
     -- Add fixed entries, as we know exactly where they need to go.

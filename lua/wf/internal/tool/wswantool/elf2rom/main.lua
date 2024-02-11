@@ -332,6 +332,7 @@ local function run_linker(args, platform)
 
     if platform.mode == "cartridge" then
         allocator_config.rom_banks = config.cartridge.rom_banks
+        allocator_config.rom_last_bank = config.cartridge.rom_last_bank or 65535
        
         local save_type = wswan.get_save_type(config.cartridge)
         if save_type ~= nil then
@@ -341,14 +342,14 @@ local function run_linker(args, platform)
         rom_header = {
             ["name"] = "(wf) ROM header",
             ["type"] = 0,
-            ["bank"] = 0xFFFF,
+            ["bank"] = allocator_config.rom_last_bank,
             ["offset"] = 0xFFF0,
             ["data"] = string.char(0):rep(16)
         }
         allocator:add(rom_header)
 
         default_alloc_type = 2
-        default_alloc_bank = 0xFFF
+        default_alloc_bank = allocator_config.rom_last_bank >> 4
         far_sections_supported = true
     elseif platform.mode == "bfb" then
         default_alloc_type = wfallocator.IRAM
@@ -751,7 +752,7 @@ local function run_linker(args, platform)
         allocated_rom_bank_offset = allocator.banks[0][allocator.bank_sizes[0].first]:allocation_start()
     end
     local rom_bank_type, rom_bank_count = romlink_calc_rom_size(config.cartridge.rom_banks or allocator.bank_sizes[0].count or 0)
-    local rom_bank_first = 65536 - rom_bank_count
+    local rom_bank_first = allocator_config.rom_last_bank + 1 - rom_bank_count
     local rom_size_bytes = rom_bank_count * 0x10000
 
     -- Build data.
@@ -828,10 +829,10 @@ local function run_linker(args, platform)
     -- Build relocated ELF.
     -- This should be done last, as it destroys "elf".
     if args.output_elf ~= nil then
-        -- Limit ELFs to 2048 banks = 128 MB. As the 2003 mapper only goes up
-        -- to 64 MB, it is unlikely for ROMs to go much bigger - we'll deal
-        -- with this when it becomes a problem.
-        if rom_bank_first < (65536 - 0x800) then
+        -- Limit ELF address space to 2048 banks = 128 MB. As the 2003 mapper
+        -- only goes up to 64 MB, it is unlikely for ROMs to go much bigger.
+        -- We can deal with this when it becomes a problem.
+        if rom_bank_first < (((allocator_config.rom_last_bank + 0x800) & (~0x7FF)) - 0x800) then
             error("rom file too large to create ELF")
         end
         
