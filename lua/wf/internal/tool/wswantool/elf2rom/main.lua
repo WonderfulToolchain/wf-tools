@@ -59,6 +59,9 @@ local function vma_entry_plus_offset(entry, offset)
     local logical_address = entry_plus_offset(entry, offset)
     if entry.type >= -2 and entry.bank ~= nil then
         logical_address = logical_address | ((entry.bank & 0xFFF) << 20)
+        if entry.type >= 0 then -- ROM address
+            logical_address = logical_address | 0x80000000
+        end
     end
     return logical_address
 end
