@@ -134,7 +134,7 @@ function M.create_rom_header(checksum, settings)
 
     local flags = settings.flags or 0x04
     if settings.rom_speed then
-        if settings.rom_speed == 3 then
+        if settings.rom_speed >= 2 then
             flags = flags | 0x08
         elseif settings.rom_speed == 1 then
             flags = flags & 0xF7
