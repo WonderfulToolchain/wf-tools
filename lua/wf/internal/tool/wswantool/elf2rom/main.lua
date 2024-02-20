@@ -749,17 +749,27 @@ local function run_linker(args, platform)
     end
     allocator:allocate(allocator_config, true)
 
-    local allocated_rom_bank_count = allocator.bank_sizes[0].count or 0
-    local allocated_rom_bank_offset = 0
-    if allocator.bank_sizes[0].first ~= nil then
-        allocated_rom_bank_offset = allocator.banks[0][allocator.bank_sizes[0].first]:allocation_start()
-    end
-    local rom_bank_type, rom_bank_count = romlink_calc_rom_size(config.cartridge.rom_banks or allocator.bank_sizes[0].count or 0)
-    local rom_bank_first = allocator_config.rom_last_bank + 1 - rom_bank_count
-    local rom_size_bytes = rom_bank_count * 0x10000
-
     -- Build data.
     if platform.mode == "cartridge" then
+        local allocated_rom_bank_count = allocator.bank_sizes[0].count or 0
+        local allocated_rom_bank_offset = 0
+        if allocator.bank_sizes[0].first ~= nil then
+            allocated_rom_bank_offset = allocator.banks[0][allocator.bank_sizes[0].first]:allocation_start()
+        end
+        local rom_bank_type, rom_bank_count = romlink_calc_rom_size(config.cartridge.rom_banks or allocator.bank_sizes[0].count or 0)
+        local rom_bank_first = allocator_config.rom_last_bank + 1 - rom_bank_count
+        local rom_size_bytes = rom_bank_count * 0x10000
+
+        -- ELF output checks.
+        if args.output_elf ~= nil then
+            -- Limit ELF address space to 2048 banks = 128 MB. As the 2003 mapper
+            -- only goes up to 64 MB, it is unlikely for ROMs to go much bigger.
+            -- We can deal with this when it becomes a problem.
+            if rom_bank_first < (((allocator_config.rom_last_bank + 0x800) & (~0x7FF)) - 0x800) then
+                error("rom file too large to create ELF")
+            end
+        end
+
         local linear, segment, offset = get_linear_logical_address(start_symbol)
         config.cartridge.start_segment = segment
         config.cartridge.start_offset = offset
@@ -832,13 +842,6 @@ local function run_linker(args, platform)
     -- Build relocated ELF.
     -- This should be done last, as it destroys "elf".
     if args.output_elf ~= nil then
-        -- Limit ELF address space to 2048 banks = 128 MB. As the 2003 mapper
-        -- only goes up to 64 MB, it is unlikely for ROMs to go much bigger.
-        -- We can deal with this when it becomes a problem.
-        if rom_bank_first < (((allocator_config.rom_last_bank + 0x800) & (~0x7FF)) - 0x800) then
-            error("rom file too large to create ELF")
-        end
-        
         local out_file <close> = io.open(args.output_elf, "wb")
         local offset = elf:get_header_size()
 
