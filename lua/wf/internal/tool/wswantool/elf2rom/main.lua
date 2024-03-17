@@ -1,6 +1,7 @@
 -- SPDX-License-Identifier: MIT
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
+local log = require('wf.internal.log')
 local path = require('pl.path')
 local stringx = require('pl.stringx')
 local tablex = require('pl.tablex')
@@ -75,7 +76,7 @@ local function get_linear_address(symbol)
         if symbol[2].shndx == wfelf.SHN_ABS then
             return symbol[2].value
         else
-            error(string.format("unsupported ELF section index 0x%04X", symbol[2].shndx))
+            log.error("unsupported ELF section index: 0x%04X", symbol[2].shndx)
         end
     elseif symbol[1] == nil then
         return symbol[2].value
@@ -93,7 +94,7 @@ local function get_vma_address(symbol)
         if symbol[2].shndx == wfelf.SHN_ABS then
             return symbol[2].value
         else
-            error(string.format("unsupported ELF section index 0x%04X", symbol[2].shndx))
+            log.error("unsupported ELF section index: 0x%04X", symbol[2].shndx)
         end
     elseif symbol[1] == nil then
         return symbol[2].value
@@ -300,12 +301,14 @@ local function build_iram_data(iram, platform)
     data = build_iram_data_push(data, joined_entry, platform)
     data = data .. string.char(0) .. string.char(0)
     if #data > 65520 then
-        error("IRAM data block too large")
+        log.error("IRAM data block too large")
     end
     return data
 end
 
 local function run_linker(args, platform)
+    log.verbose = log.verbose or args.verbose
+
     local config = {}
     local config_filename = args.config or "wfconfig.toml"
     if (args.config ~= nil) or path.exists(config_filename) then
@@ -377,8 +380,10 @@ local function run_linker(args, platform)
         -- TODO: Set to false once near_section supports garbage collection
         far_sections_supported = true
     else
-        error("unsupported platform: " .. platform.mode)
+        log.error("unsupported platform: " .. platform.mode)
     end
+
+    log.exit_if_fatal()
 
     local near_section = {
         ["name"] = "(wf) near section",
@@ -399,8 +404,10 @@ local function run_linker(args, platform)
 
     -- Parse ELF.
     if #elf.phdr > 0 then
-        error("PHDRs unsupported")
+        log.error("unsupported ELF PHDRs")
     end
+
+    log.exit_if_fatal()
 
     -- Allocate sections.
     local sections = {}
@@ -505,6 +512,8 @@ local function run_linker(args, platform)
         end
     end
 
+    log.exit_if_fatal()
+
     -- Parse symbol table.
     local symbols = {}
     local symbols_by_name = {} 
@@ -516,7 +525,7 @@ local function run_linker(args, platform)
             "<I4I4I4BBI2", elf_file:read(symtab.entsize)
         )
         if sym.shndx == wfelf.SHN_XINDEX then
-            error("TODO: handle SHN_XINDEX - workaround: disable -ffunction-sections, -fdata-sections, or both")
+            log.error("unsupported ELF SHN_XINDEX (as a workaround, disable -ffunction-sections, -fdata-sections, or both)")
         end
         local symbol_type = sym.info & 0xF
         local symbol_name
@@ -541,7 +550,7 @@ local function run_linker(args, platform)
         if shdr.type == wfelf.SHT_REL then
             local target_section = sections[shdr.info + 1]
             if target_section == nil then
-                error("could not find target for relocation section " .. wfelf.read_string(elf_file, shstrtab, elf.shdr[i].name))
+                log.error("could not find target for relocation section " .. wfelf.read_string(elf_file, shstrtab, elf.shdr[i].name))
             end
             local count = shdr.size / shdr.entsize
             for i=1,count do
@@ -558,16 +567,21 @@ local function run_linker(args, platform)
                 })
             end
         elseif shdr.type == wfelf.SHT_RELA then
-            error("'rela' relocation sections not implemented")
+            log.error("'rela' relocation sections not implemented")
         end
     end
 
+    log.exit_if_fatal()
+
     local start_symbol = symbols_by_name["_start"]
     if start_symbol == nil then
-        error("could not find symbol: _start")
+        log.error("could not find symbol: _start")
+    else
+        retained_sections[start_symbol[1].input_index] = true
     end
-    retained_sections[start_symbol[1].input_index] = true
-    
+ 
+    log.exit_if_fatal()
+
     if gc_enabled then
         -- Perform garbage collection by using relocation tables as a section usage map.
         local section_children = {} -- section: {sections...}
@@ -615,9 +629,7 @@ local function run_linker(args, platform)
                 if retained_sections[v.input_index] then
                     allocated_sections[i] = v
                 else
-                    if args.verbose then
-                        print("[gc] removing section " .. v.name)
-                    end
+                    log.info("gc: removing section " .. v.name)
                 end
             end
         end
@@ -675,58 +687,72 @@ local function run_linker(args, platform)
     emit_raw_symbol(symbols_by_name, ".debug_frame!", 0)
 
     -- Apply relocations.
+    local symbols_not_found = {}
     for i, relocation in pairs(relocations) do
         local r_offset = relocation.offset
         local r_type = relocation.type
         local target_section = relocation.section
         local symbol = relocation.symbol
-        if symbol[2].shndx == wfelf.SHN_UNDEF then
+
+        local symbol_found = symbol[2].shndx ~= wfelf.SHN_UNDEF
+        if not symbol_found then
             -- We may have added the symbol to symbols_by_name manually.
             symbol = symbols_by_name[symbol[3]]
-            if symbol == nil or symbol[2].shndx == wfelf.SHN_UNDEF then
+            local symbol_key = symbol[3]
+            symbol_found = symbol ~= nil and symbol[2].shndx ~= wfelf.SHN_UNDEF
+            if not symbol_found then
                 if stringx.startswith(symbol[3], "__bank_") then
                     -- __bank handling: Dynamically create a faux-symbol.
-                    local key = symbol[3]:sub(8)
-                    symbol = symbols_by_name[key]
-                    if symbol == nil or symbol[1] == nil then
-                        error("could not locate symbol: " .. symbol[3])
+                    symbol_key = symbol[3]:sub(8)
+                    symbol = symbols_by_name[symbol_key]
+                    if symbol ~= nil and symbol[1] ~= nil then
+                        symbol = {nil, symbol[1].bank or 0, symbol_key}
+                        symbols_by_name[symbol_key] = symbol
+                        symbol_found = true
                     end
-                    symbol = {nil, symbol[1].bank or 0, key}
-                    symbols_by_name[key] = symbol
-                else
-                    error("could not locate symbol: " .. symbol[3])
+                end
+            end
+
+            if not symbol_found then
+                if symbols_not_found[symbol[3]] == nil then
+                    symbols_not_found[symbol[3]] = true
+                    log.error("could not locate symbol: " .. symbol[3])
                 end
             end
         end
 
-        local linear, segment, offset = get_linear_logical_address(symbol)
-        if r_type == wfelf.R_386_OZSEG16 then
-            target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v + segment end)
-        else
-            local value = linear
-            if stringx.endswith(symbol[3], "!") then
-                value = segment << 4
-            end
-            if r_type == wfelf.R_386_32 then
-                -- debug section workaround: use ELF VMA address
-                value = get_vma_address(symbol)
-                target_section.data = relocate32le(target_section.data, r_offset + 1, function(v) return v + value end)
-            elseif r_type == wfelf.R_386_16 then
-                target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v + value end)
-            elseif r_type == wfelf.R_386_SUB16 then
-                target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v - value end)
-            elseif r_type == wfelf.R_386_SUB32 then
-                -- debug section workaround: skip this relocation
-            elseif r_type == wfelf.R_386_SEG16 then
-                target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return ((v << 4) + value) >> 4 end)
-            elseif r_type == wfelf.R_386_PC16 then
-                value = value - entry_plus_offset(target_section, r_offset)
-                target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v + value end)
+        if symbol_found then
+            local linear, segment, offset = get_linear_logical_address(symbol)
+            if r_type == wfelf.R_386_OZSEG16 then
+                target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v + segment end)
             else
-                error("unsupported relocation type " .. r_type)
+                local value = linear
+                if stringx.endswith(symbol[3], "!") then
+                    value = segment << 4
+                end
+                if r_type == wfelf.R_386_32 then
+                    -- debug section workaround: use ELF VMA address
+                    value = get_vma_address(symbol)
+                    target_section.data = relocate32le(target_section.data, r_offset + 1, function(v) return v + value end)
+                elseif r_type == wfelf.R_386_16 then
+                    target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v + value end)
+                elseif r_type == wfelf.R_386_SUB16 then
+                    target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v - value end)
+                elseif r_type == wfelf.R_386_SUB32 then
+                    -- debug section workaround: skip this relocation
+                elseif r_type == wfelf.R_386_SEG16 then
+                    target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return ((v << 4) + value) >> 4 end)
+                elseif r_type == wfelf.R_386_PC16 then
+                    value = value - entry_plus_offset(target_section, r_offset)
+                    target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v + value end)
+                else
+                    log.error("unsupported relocation type " .. r_type)
+                end
             end
         end
     end
+
+    log.exit_if_fatal()
 
     -- Copy IRAM data to ROM.
     iram_entry.data = build_iram_data(iram, platform)
@@ -735,11 +761,13 @@ local function run_linker(args, platform)
         for i, bank in pairs(allocator.banks[wfallocator.SRAM]) do
             for j, entry in pairs(bank.entries) do
                 if entry.empty == 0 then
-                    error("unsupported: symbol " .. (entry.name or "???") .. " in SRAM contains data")
+                    log.error("unsupported: symbol " .. (entry.name or "???") .. " in SRAM contains data")
                 end
             end
         end
     end
+
+    log.exit_if_fatal()
 
     -- Finalize allocation.
     for i, v in pairs(sections) do
@@ -766,9 +794,11 @@ local function run_linker(args, platform)
             -- only goes up to 64 MB, it is unlikely for ROMs to go much bigger.
             -- We can deal with this when it becomes a problem.
             if rom_bank_first < (((allocator_config.rom_last_bank + 0x800) & (~0x7FF)) - 0x800) then
-                error("rom file too large to create ELF")
+                log.error("rom file too large to create ELF")
             end
         end
+
+        log.exit_if_fatal()
 
         local linear, segment, offset = get_linear_logical_address(start_symbol)
         config.cartridge.start_segment = segment
@@ -817,8 +847,10 @@ local function run_linker(args, platform)
     elseif platform.mode == "bfb" then
         local linear, segment, offset = get_linear_logical_address(start_symbol)
         if segment ~= 0x0000 then
-            error(string.format("unsupported: non-zero .bfb start segment [%04X:%04X]", segment, offset))
+            log.error("unsupported: non-zero .bfb start segment [%04X:%04X]", segment, offset)
         end
+
+        log.exit_if_fatal()
 
         local rom_file <close> = io.open(args.output, "wb")
         rom_file:write("bF")
@@ -828,7 +860,7 @@ local function run_linker(args, platform)
             local offset = entry.offset - offset
             local is_empty = is_string_empty(entry.data)
             if offset < 0 and not is_empty then
-                error("unsupported: non-empty entry outside of data region")
+                log.error("unsupported: non-empty entry outside of data region")
             end
             if not is_empty then
                 rom_file:seek("set", offset + 4)
@@ -836,8 +868,10 @@ local function run_linker(args, platform)
             end
         end
     else
-        error("unsupported mode: " .. platform.mode)
+        log.error("unsupported mode: " .. platform.mode)
     end
+
+    log.exit_if_fatal()
 
     -- Build relocated ELF.
     -- This should be done last, as it destroys "elf".
@@ -943,6 +977,8 @@ local function run_linker(args, platform)
         out_file:seek("set", 0)
         elf:write_header(out_file)
     end
+
+    log.exit_if_fatal()
 end
 
 local args_doc = [[
