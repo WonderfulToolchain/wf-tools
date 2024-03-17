@@ -552,6 +552,9 @@ local function run_linker(args, platform)
             if target_section == nil then
                 log.error("could not find target for relocation section " .. wfelf.read_string(elf_file, shstrtab, elf.shdr[i].name))
             end
+            if target_section.empty > 0 then
+                target_section.empty = 0
+            end
             local count = shdr.size / shdr.entsize
             for i=1,count do
                 elf_file:seek("set", shdr.offset + ((i - 1) * shdr.entsize))
