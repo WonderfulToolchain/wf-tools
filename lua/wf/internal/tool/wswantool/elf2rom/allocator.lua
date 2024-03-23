@@ -330,6 +330,9 @@ local function try_place_entry_inner(banks, entry)
         if entry.offset == nil then
             joined_linear_start = calc_eoffset(joined_linear_start, joined_linear_end, #entry.data, bank.descending, entry.align)
         end
+        if joined_linear_start == nil then
+            return false
+        end
         joined_linear_end = joined_linear_start + #entry.data
         local joined_start_bank = joined_linear_start // bank.size
         local joined_start_offset = joined_linear_start % bank.size
