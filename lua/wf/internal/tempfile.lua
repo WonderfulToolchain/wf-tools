@@ -12,6 +12,7 @@ local posix_stdlib
 if not compat.is_windows then
     posix_stdlib = require('posix.stdlib')
 end
+local stringx = require('pl.stringx')
 
 local M = {}
 
@@ -25,6 +26,15 @@ local tmp_directory_mt = {
 tmp_directory_mt["__gc"] = tmp_directory_mt["__close"]
 local function tmp_directory_path(obj, ...)
     return path.join(obj.name, table.unpack({...}))
+end
+
+local tmp_directory_parent = path.abspath(path.join(os.tmpname(), ".."))
+--- Returns true if the provided path is in a temporary directory.
+-- @tparam string dir Directory/file path to check.
+M.is_in_temp_path = function(dir)
+    print(path.abspath(dir))
+    print(tmp_directory_parent)
+    return stringx.startswith(path.abspath(dir), tmp_directory_parent .. path.sep)
 end
 
 --- Create a temporary directory, which supports automatic tree removal using a to-be-closed variable.

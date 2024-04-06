@@ -159,7 +159,7 @@ local scapture_enabled = false
 _WFPROCESS.access_file = function(name, mode)
     if scapture_enabled then
         name = path.abspath(name)
-        if not stringx.startswith(name, _WFPROCESS.temp_dir.name) then
+        if not wftempfile.is_in_temp_path(name) then
             if mode == nil or stringx.startswith(mode, "r") then
                 sinputs[name] = true
             else
