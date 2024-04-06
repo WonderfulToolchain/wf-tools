@@ -32,8 +32,6 @@ local tmp_directory_parent = path.abspath(path.join(os.tmpname(), ".."))
 --- Returns true if the provided path is in a temporary directory.
 -- @tparam string dir Directory/file path to check.
 M.is_in_temp_path = function(dir)
-    print(path.abspath(dir))
-    print(tmp_directory_parent)
     return stringx.startswith(path.abspath(dir), tmp_directory_parent .. path.sep)
 end
 
