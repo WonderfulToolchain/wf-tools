@@ -25,10 +25,7 @@ local function tool_run(tool_path, input, mode)
 
     process.touch(input, "rb")
     process.touch(output, "wb")    
-    args = {mode, output.file}
-    if not dir.copyfile(input.file, output.file) then
-        error("temporary file creation failed")
-    end
+    args = {mode, input.file, output.file}
     wfutil.execute_or_error(tool_path, args, wfutil.OUTPUT_SHELL, _WFPROCESS.verbose)
     return output
 end
