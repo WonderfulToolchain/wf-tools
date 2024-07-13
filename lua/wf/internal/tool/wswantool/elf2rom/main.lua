@@ -894,7 +894,7 @@ local function run_linker(args, platform)
         for i=1,#old_shdr do
             local shdr = old_shdr[i]
             local add_shdr = false
-            if shdr.type == wfelf.SHT_PROGBITS or shdr.type == wfelf.SHT_NOBITS then
+            if shdr.type == wfelf.SHT_PROGBITS or shdr.type == wfelf.SHT_NOBITS or shdr.type == wfelf.SHT_NULL then
                 local section = sections[i]
                 if section ~= nil and section.input_alloc then
                     local section_name = wfelf.read_string(elf_file, shstrtab, shdr.name)
