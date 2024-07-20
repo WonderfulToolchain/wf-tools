@@ -15,6 +15,7 @@ local wfutil = require('wf.internal.util')
 local args = lapp [[
 wf-bin2s: convert binary file to .s/.h file pair
   -a,--align      (optional number)   Data alignment.
+  --address-space (optional string)   Address space (for wswan/.h files).
   --section       (optional string)   Section.
   <output_dir>    (string)            Output directory.
   <input_file>    (string)            Input binary file (use '-' for stdin).
@@ -60,10 +61,11 @@ input_file:close()
 local c_file <close> = lapp.open(output_path .. ".s", "w")
 local h_file <close> = lapp.open(output_path .. ".h", "w")
 
-wfbin2c.bin2s(c_file, h_file, "wf-bin2c", {
+wfbin2c.bin2s(c_file, h_file, "wf-bin2s", {
   [array_name] = {
-    ["address_space"]=args.address_space,
+    ["adddress_space"]=args.address_space,
     ["align"]=args.align,
-    ["data"]=input_data
+    ["data"]=input_data,
+    ["section"]=args.section
   }
 })

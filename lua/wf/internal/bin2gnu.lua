@@ -98,7 +98,7 @@ local function bin2cs(c_file, h_file, program_name, entries, write_asm)
                 if entry.align then
                     c_file:write("\t.balign " .. entry.align .. "\n")
                 end
-                c_file:write("\t.global " .. array_name .. "\n ".. array_name .. ":")
+                c_file:write("\t.global " .. array_name .. "\n".. array_name .. ":")
                 for i = 1, #data, width do
                     if (i % asm_values_per_line) == 1 then
                         c_file:write("\n\t.byte ")
