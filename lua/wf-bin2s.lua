@@ -14,12 +14,13 @@ local wfutil = require('wf.internal.util')
 
 local args = lapp [[
 wf-bin2s: convert binary file to .s/.h file pair
-  -a,--align      (optional number)   Data alignment.
-  --address-space (optional string)   Address space (for wswan/.h files).
-  --section       (optional string)   Section.
-  <output_dir>    (string)            Output directory.
-  <input_file>    (string)            Input binary file (use '-' for stdin).
-  <array_name>    (optional string)   Array name.
+  -a,--align       (optional number)   Data alignment.
+  --address-space  (optional string)   Address space (for wswan/.h files).
+  --hide-size-in-header                Hide array size in .h file.
+  --section        (optional string)   Section.
+  <output_dir>     (string)            Output directory.
+  <input_file>     (string)            Input binary file (use '-' for stdin).
+  <array_name>     (optional string)   Array name.
 ]]
 
 --- open input file
@@ -63,9 +64,11 @@ local h_file <close> = lapp.open(output_path .. ".h", "w")
 
 wfbin2c.bin2s(c_file, h_file, "wf-bin2s", {
   [array_name] = {
-    ["adddress_space"]=args.address_space,
+    ["address_space"]=args.address_space,
     ["align"]=args.align,
     ["data"]=input_data,
+    ["hide_size_from_header"]=args.hide_size_in_header,
+    ["max_header_size"]=args.max_header_size,
     ["section"]=args.section
   }
 })
