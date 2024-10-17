@@ -483,6 +483,8 @@ local function run_linker(args, platform)
                         section_entry.segment = near_section
                         section_entry.segment_offset = #near_section.data
                         near_section.data = near_section.data .. data
+                    elseif args.ds_sram then
+                        section_entry.type = wfallocator.SRAM
                     else
                         section_entry.type = wfallocator.IRAM
                     end
@@ -663,6 +665,10 @@ local function run_linker(args, platform)
     end
 
     local iram = allocator.banks[wfallocator.IRAM][1]
+    if args.ds_sram then
+        iram = allocator.banks[wfallocator.SRAM][0]
+    end
+
     local iram_entry = {
         ["name"] = "(wf) ROM -> IRAM copy",
         ["type"] = default_alloc_type,
@@ -670,7 +676,7 @@ local function run_linker(args, platform)
         ["offset"] = default_alloc_offset,
         ["align"] = 2
     }
-    if platform.mode == "bfb" then
+    if args.ds_sram or platform.mode == "bfb" then
         iram_entry.align = 1
     end
     iram_entry.data = build_iram_data(iram, platform)
@@ -678,7 +684,9 @@ local function run_linker(args, platform)
     allocator:allocate(allocator_config, false)
 
     local heap_start, heap_length
-    if platform.mode == "bfb" then
+    if args.ds_sram then
+        heap_start, heap_length = iram:find_gap(0, 0xFFFE, true)
+    elseif platform.mode == "bfb" then
         heap_start, heap_length = iram:find_gap(0, 0xFE00, true)
     else
         heap_start, heap_length = iram:find_gap(0, 0x4000, true)
@@ -759,12 +767,22 @@ local function run_linker(args, platform)
 
     -- Copy IRAM data to ROM.
     iram_entry.data = build_iram_data(iram, platform)
-    -- Check if no data is attmepted to be written in SRAM.
-    if platform.mode == "cartridge" then
+    -- Check if no data is attmepted to be written in SRAM (DS == IRAM).
+    if platform.mode == "cartridge" and not args.ds_sram then
         for i, bank in pairs(allocator.banks[wfallocator.SRAM]) do
             for j, entry in pairs(bank.entries) do
                 if entry.empty == 0 then
                     log.error("unsupported: symbol " .. (entry.name or "???") .. " in SRAM contains data")
+                end
+            end
+        end
+    end
+    -- Check if no data is attmepted to be written in IRAM (DS == SRAM).
+    if platform.mode == "cartridge" and args.ds_sram then
+        for i, bank in pairs(allocator.banks[wfallocator.IRAM]) do
+            for j, entry in pairs(bank.entries) do
+                if entry.empty == 0 then
+                    log.error("unsupported: symbol " .. (entry.name or "???") .. " in IRAM contains data")
                 end
             end
         end
@@ -1009,6 +1027,7 @@ return {
     ["rom"] = {
         ["arguments"] = [[
 [args...] <input>: convert an ELF file to a wswan ROM
+    --ds-sram                        Place the default data segment in SRAM.
     --trim                           Trim the assembled ROM by removing unused
                                      space from the beginning of the file.
 ]] .. args_doc,
