@@ -13,7 +13,7 @@ int main(int argc, char **argv) {
 	FILE *outf = fopen(argv[1], "wb");
 	if (outf == NULL) return 1;
 
-	fprintf(outf, "[");
+	if (fprintf(outf, "[") < 0) return 1;
 
 	size_t buffersize = 32767;
 	size_t infsize;
@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
 		if (inf == NULL) continue;
 
 		if (buffervalid) {
-			fprintf(outf, "%s", buffer);
+			if (fprintf(outf, "%s", buffer) < 0) return 1;
 			buffervalid = false;
 		}
 
@@ -53,11 +53,12 @@ int main(int argc, char **argv) {
 		while (*lastc <= 32 || *lastc == ',') lastc--;
 		lastc[1] = 0;
 
-		fprintf(outf, "%s", buffer);
+		if (fprintf(outf, "%s", buffer) < 0) return 1;
 		buffervalid = false;
 	}
 
-	fprintf(outf, "]\n");
+	if (fprintf(outf, "]\n") < 0) return 1;
+	fclose(outf);
 
 	return 0;
 }
