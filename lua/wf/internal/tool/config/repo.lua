@@ -7,17 +7,20 @@ local path = require("pl.path")
 local wflog = require("wf.internal.log")
 local wfpath = require("wf.internal.path")
 
+local tpl_loc = path.join(wfpath.base, "pacman", "config")
+local cfg_loc = path.join(wfpath.base, "etc", "pacman.d")
+
 local function repo_enable_run(args)
     wflog.verbose = args.verbose
-
-    local tpl_loc = path.join(wfpath.base, "pacman/config")
-    local cfg_loc = path.join(wfpath.base, "etc/pacman.d")
 
     local found = false
     for _, loc in pairs(dir.getfiles(tpl_loc, "*-" .. args.repo_name .. ".conf")) do
         wflog.info("adding " .. loc)
         local dloc, floc = path.splitpath(loc)
-        lfs.link(path.relpath(loc, cfg_loc), path.join(cfg_loc, floc), true)
+        local dst_loc = path.join(cfg_loc, floc)
+        if lfs.link(path.relpath(loc, cfg_loc), dst_loc, true) == nil then
+            dir.copyfile(loc, dst_loc)
+        end
         found = true
     end
     if not found then
@@ -27,9 +30,6 @@ end
 
 local function repo_disable_run(args)
     wflog.verbose = args.verbose
-
-    local tpl_loc = path.join(wfpath.base, "pacman/config")
-    local cfg_loc = path.join(wfpath.base, "etc/pacman.d")
 
     local found = false
     for _, loc in pairs(dir.getfiles(tpl_loc, "*-" .. args.repo_name .. ".conf")) do
