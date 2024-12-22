@@ -32,10 +32,14 @@ local function repo_disable_run(args)
     local cfg_loc = path.join(wfpath.base, "etc/pacman.d")
 
     local found = false
-    for _, loc in pairs(dir.getfiles(cfg_loc, "*-" .. args.repo_name .. ".conf")) do
-        wflog.info("removing " .. loc)
-        os.remove(loc)
-        found = true
+    for _, loc in pairs(dir.getfiles(tpl_loc, "*-" .. args.repo_name .. ".conf")) do
+        local dloc, floc = path.splitpath(loc)
+        local loc_at_cfg = path.join(cfg_loc, floc)
+        if path.exists(loc_at_cfg) then
+            wflog.info("removing " .. loc_at_cfg)
+            os.remove(loc_at_cfg)
+            found = true
+        end
     end
     if not found then
         wflog.error("repository \"" .. args.repo_name .. "\" was not previously enabled")
