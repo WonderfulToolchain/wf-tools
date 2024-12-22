@@ -32,16 +32,20 @@ local function repo_disable_run(args)
     wflog.verbose = args.verbose
 
     local found = false
+    local removed = false
     for _, loc in pairs(dir.getfiles(tpl_loc, "*-" .. args.repo_name .. ".conf")) do
         local dloc, floc = path.splitpath(loc)
         local loc_at_cfg = path.join(cfg_loc, floc)
         if path.exists(loc_at_cfg) then
             wflog.info("removing " .. loc_at_cfg)
             os.remove(loc_at_cfg)
-            found = true
+            removed = true
         end
+        found = true
     end
     if not found then
+        wflog.error("configuration files not found for repository \"" .. args.repo_name .. "\"")
+    elseif not removed then
         wflog.error("repository \"" .. args.repo_name .. "\" was not previously enabled")
     end
 end
