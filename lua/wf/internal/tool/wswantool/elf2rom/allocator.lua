@@ -388,8 +388,15 @@ end
 local function try_place_entry(banks, entry)
     banks = banks[entry.type]
 
-    if entry.type == 2 and entry.bank ~= nil then
-        for i=(entry.bank * 16 + 15),(entry.bank * 16 + 4),-1 do
+    if entry.type == 2 and entry.bank ~= nil and entry.offset ~= nil then
+        -- reformat 12:20-bit pointer to 16:16-bit pointer
+        entry.bank = ((entry.bank & 0xFFF) << 4) | ((entry.offset >> 16) & 0xF)
+        entry.offset = entry.offset & 0xFFFF
+        if try_place_entry_inner(banks, entry) then
+            return true
+        end
+    elseif entry.type == 2 and entry.bank ~= nil and entry.offset == nil then
+        for i=((entry.bank * 16 + 15) & 0xFFFF),((entry.bank * 16 + 4) & 0xFFFF),-1 do
             entry.bank = i
             if try_place_entry_inner(banks, entry) then
                 return true
