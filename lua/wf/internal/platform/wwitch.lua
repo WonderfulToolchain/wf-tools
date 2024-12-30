@@ -59,8 +59,8 @@ function M.create_fent_header(settings)
     local mtime = M.unix_to_freya_time(settings.mtime or os.time())
 
     return "#!ws" .. string.char(255):rep(60)
-        .. wfstring.convert(settings.name, "sjis", "utf8", 16)
-        .. wfstring.convert(settings.info or settings.name, "sjis", "utf8", 24)
+        .. wfstring.convert(settings.name, wfstring.encoding.shiftjis, wfstring.encoding.utf8, 16)
+        .. wfstring.convert(settings.info or settings.name, wfstring.encoding.shiftjis, wfstring.encoding.utf8, 24)
         .. string.pack(
             "< I4 I4 I2 I2 I4 I4 i4",
             0, -- TODO: unknown

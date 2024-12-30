@@ -8,6 +8,11 @@
 local iconv = require("iconv")
 local M = {}
 
+--- Useful constants for M.convert
+M.encoding = {}
+M.encoding.utf8 = "utf-8"
+M.encoding.shiftjis = "sjis"
+
 --- Pad a string to a specific length, padded by a specific character.
 -- This will both truncate and expand the string.
 -- @tparam string value The string to pad.
@@ -36,7 +41,7 @@ function M.convert(s, to, from, length)
     if from == to then
         result = s
     else
-        local cvt = iconv.new(to, from or "utf8")
+        local cvt = iconv.new(to, from or M.encoding.utf8)
         result, err = cvt:iconv(s)
         if err ~= nil then
             error("could not convert string from " .. from .. " to " .. to)
