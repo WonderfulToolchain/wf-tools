@@ -5,6 +5,7 @@
 -- @module wf.internal.platform.wwitch
 -- @alias M
 
+local wfmath = require("wf.internal.math")
 local wfstring = require("wf.internal.string")
 local M = {}
 
@@ -13,9 +14,12 @@ M.FILE_ATTRIBUTE_FLAGS = {
     ["x"] = 0x01, -- Execute flag.
     ["w"] = 0x02, -- Write flag.
     ["r"] = 0x04, -- Read flag.
-    ["i"] = 0x20 -- IL flag.
+    ["m"] = 0x08, -- Prohibit mmap() use
+    ["s"] = 0x10,
+    ["i"] = 0x20, -- IL flag.
+    ["l"] = 0x40, -- Symbolic link.
+    ["d"] = 0x80  -- Directory.
 }
--- TODO: Add remaining modes.
 
 --- Convert file attributes to their integer value.
 -- @tparam mode number|string Input file attribute value.
@@ -43,7 +47,13 @@ function M.file_attributes_to_integer(mode)
 end
 
 function M.unix_to_freya_time(value)
-    return math.min(0x7FFFFFFF, math.max(0, value - 946080000))
+    local date = os.date("*t", value)
+    return wfmath.clamp(date.sec >> 1, 0, 29)
+        | (wfmath.clamp(date.min, 0, 59) << 5)
+        | (wfmath.clamp(date.hour, 0, 23) << 11)
+        | (wfmath.clamp(date.day, 1, 31) << 16)
+        | (wfmath.clamp(date.month, 1, 12) << 21)
+        | ((date.year - 2000) << 25)
 end
 
 function M.create_fent_header(settings)
@@ -54,7 +64,7 @@ function M.create_fent_header(settings)
         resource_start = settings.length
     end
     local xmodem_chunk_count = (total_length + 127) >> 7
-    local mode = M.file_attributes_to_integer(settings.mode or 7)
+    local mode = M.file_attributes_to_integer(settings.mode or 7) & 0x2F
     -- seconds since January 1st, 2000
     local mtime = M.unix_to_freya_time(settings.mtime or os.time())
 

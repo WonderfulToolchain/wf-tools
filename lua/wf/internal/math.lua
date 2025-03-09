@@ -75,4 +75,10 @@ function M.to_bcd(value, bits)
     return result
 end
 
+function M.clamp(value, min_value, max_value)
+    if value <= min_value then return min_value
+    elseif value >= max_value then return max_value
+    else return value end
+end
+
 return M
