@@ -13,23 +13,33 @@ local wfutil = require("wf.internal.util")
 local M = {}
 
 local dir_separator = compat.dir_separator
-local base_dir, executable_extension
+local base_path, executable_extension
+local base_dir = os.getenv("WONDERFUL_TOOLCHAIN")
+if #base_dir <= 0 then
+    base_dir = "/opt/wonderful"
+end
+
 if compat.is_windows then
     executable_extension = '.exe'
     local bd_success, bd_error_code
-    bd_success, bd_error_code, base_dir = wfutil.execute(
-        "cygpath", {"-w", "/opt/wonderful"},
+    bd_success, bd_error_code, base_path = wfutil.execute(
+        "cygpath", {"-w", base_dir},
         wfutil.OUTPUT_CAPTURE
     )
     if not bd_success then
         error("could not retrieve toolchain directory")
     end
-    base_dir = stringx.strip(base_dir)
+    base_path = stringx.strip(base_path)
 else
     executable_extension = ''
-    base_dir = '/opt/wonderful'
+    base_path = base_dir
 end
-M.base = base_dir
+
+--- Base (WONDERFUL_TOOLCHAIN) directory path.
+M.base = base_path
+
+--- Base (WONDERFUL_TOOLCHAIN) directory user-friendly name.
+M.base_name = base_dir
 
 --- Generate an absolute path to the given executable.
 -- @tparam string binary_name The executable name.
@@ -42,7 +52,7 @@ function M.executable(binary_name, subpath)
         subpath = ""
     end
 
-    return path.join(base_dir, subpath .. "bin", binary_name .. executable_extension)
+    return path.join(base_path, subpath .. "bin", binary_name .. executable_extension)
 end
 
 function M.copypath(src, dest, filter)
