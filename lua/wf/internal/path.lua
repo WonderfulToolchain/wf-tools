@@ -15,7 +15,7 @@ local M = {}
 local dir_separator = compat.dir_separator
 local base_path, executable_extension
 local base_dir = os.getenv("WONDERFUL_TOOLCHAIN")
-if #base_dir <= 0 then
+if base_dir == nil or #base_dir <= 0 then
     base_dir = "/opt/wonderful"
 end
 
