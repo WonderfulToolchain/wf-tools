@@ -708,18 +708,22 @@ local function run_linker(args, platform)
         local symbol_found = symbol[2].shndx ~= wfelf.SHN_UNDEF
         if not symbol_found then
             -- We may have added the symbol to symbols_by_name manually.
-            symbol = symbols_by_name[symbol[3]]
-            local symbol_key = symbol[3]
-            symbol_found = symbol ~= nil and symbol[2].shndx ~= wfelf.SHN_UNDEF
-            if not symbol_found then
-                if stringx.startswith(symbol[3], "__bank_") then
-                    -- __bank handling: Dynamically create a faux-symbol.
-                    symbol_key = symbol[3]:sub(8)
-                    symbol = symbols_by_name[symbol_key]
-                    if symbol ~= nil and symbol[1] ~= nil then
-                        symbol = {nil, symbol[1].bank or 0, symbol_key}
-                        symbols_by_name[symbol_key] = symbol
-                        symbol_found = true
+            if symbols_by_name[symbol[3]] ~= nil then
+                symbol = symbols_by_name[symbol[3]]
+                local symbol_key = symbol[3]
+                symbol_found = symbol ~= nil and symbol[2].shndx ~= wfelf.SHN_UNDEF
+                if not symbol_found then
+                    if stringx.startswith(symbol[3], "__bank_") then
+                        -- __bank handling: Dynamically create a faux-symbol.
+                        symbol_key = symbol[3]:sub(8)
+                        if symbols_by_name[symbol_key] ~= nil then
+                            symbol = symbols_by_name[symbol_key]
+                            if symbol ~= nil and symbol[1] ~= nil then
+                                symbol = {nil, symbol[1].bank or 0, symbol_key}
+                                symbols_by_name[symbol_key] = symbol
+                                symbol_found = true
+                            end
+                        end
                     end
                 end
             end
