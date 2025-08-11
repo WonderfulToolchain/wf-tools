@@ -304,9 +304,9 @@ if args.depfile ~= nil then
         soutputs[args.depfile_target] = true
     end
     for ok, ov in pairs(soutputs) do
-        depfile:write(wfmake.escape(ok) .. ":")
+        depfile:write(wfmake.escape(path.relpath(ok)) .. ":")
         for ik, iv in pairs(sinputs) do
-            depfile:write(" " .. wfmake.escape(ik))
+            depfile:write(" " .. wfmake.escape(path.relpath(ik)))
         end
         depfile:write("\n\n")
     end
