@@ -7,6 +7,7 @@ local lfs = require("lfs")
 local path = require("pl.path")
 local stringx = require("pl.stringx")
 local tablex = require("pl.tablex")
+local wfmake = require("wf.internal.make") 
 local wftempfile = require("wf.internal.tempfile")
 
 local args = lapp [[
@@ -303,9 +304,9 @@ if args.depfile ~= nil then
         soutputs[args.depfile_target] = true
     end
     for ok, ov in pairs(soutputs) do
-        depfile:write(ok .. ":")
+        depfile:write(wfmake.escape(ok) .. ":")
         for ik, iv in pairs(sinputs) do
-            depfile:write(" " .. ik)
+            depfile:write(" " .. wfmake.escape(ik))
         end
         depfile:write("\n\n")
     end
