@@ -2,8 +2,6 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
 --- <a href="https://github.com/WonderfulToolchain/lzsa">wf-lzsa</a> tool wrapper.
--- @module wf.api.v1.process.tools.lzsa
--- @alias M
 
 local process = require("wf.api.v1.process")
 local path = require("pl.path")
@@ -38,25 +36,25 @@ local function tool_run(input, args, config)
 end
 
 --- LZSA tool configuration.
--- @type lzsa.Config
+--- @class wf.api.v1.process.tools.lzsa.Config
 local config = {}
 
 --- Compress/decompress data backwards.
--- @treturn table Configuration table.
+--- @return wf.api.v1.process.tools.lzsa.Config self Configuration table.
 function config:backward()
     self.data.backward = true
     return self
 end
 
 --- Optimize for compression speed.
--- @treturn table Configuration table.
+--- @return wf.api.v1.process.tools.lzsa.Config self Configuration table.
 function config:fast()
     self.data.fast = true
     return self
 end
 
 --- Enable verbose terminal output.
--- @treturn table Configuration table.
+--- @return wf.api.v1.process.tools.lzsa.Config self Configuration table.
 function config:verbose()
     self.data.verbose = true
     return self
@@ -68,8 +66,8 @@ end
 local M = {}
 
 --- Create a configuration table.
--- @tparam ?table options Initial options.
--- @treturn table Configuration table.
+--- @param options? table Initial options.
+--- @return wf.api.v1.process.tools.lzsa.Config self Configuration table.
 function M.config(options)
     local c = tablex.deepcopy(options or {})
     local result = {["data"]=c}
@@ -78,73 +76,73 @@ function M.config(options)
 end
 
 --- Compress file data to raw LZSA1.
--- @tparam string input Input file data.
--- @tparam ?table config Configuration table.
--- @treturn string Converted file data.
--- @see config
+--- @param input wf.api.v1.process.IngredientOrFilename Input file data.
+--- @param config? table Configuration table.
+--- @return wf.api.v1.process.Ingredient output Converted file data.
+--- @see wf.api.v1.process.tools.lzsa.Config
 function M.compress1(input, config)
     return tool_run(input, {"-r", "-f", "1"}, config)
 end
 
 --- Compress file data to raw LZSA2.
--- @tparam string input Input file data.
--- @tparam ?table config Configuration table.
--- @treturn string Converted file data.
--- @see config
+--- @param input wf.api.v1.process.IngredientOrFilename Input file data.
+--- @param config? table Configuration table.
+--- @return wf.api.v1.process.Ingredient output Converted file data.
+--- @see wf.api.v1.process.tools.lzsa.Config
 function M.compress2(input, config)
     return tool_run(input, {"-r", "-f", "2"}, config)
 end
 
 --- Compress file data to headered LZSA1.
--- @tparam string input Input file data.
--- @tparam ?table config Configuration table.
--- @treturn string Converted file data.
--- @see config
+--- @param input wf.api.v1.process.IngredientOrFilename Input file data.
+--- @param config? table Configuration table.
+--- @return wf.api.v1.process.Ingredient output Converted file data.
+--- @see wf.api.v1.process.tools.lzsa.Config
 function M.compress1_block(input, config)
     return tool_run(input, {"-f", "1"}, config)
 end
 
 --- Compress file data to headered LZSA2.
--- @tparam string input Input file data.
--- @tparam ?table config Configuration table.
--- @treturn string Converted file data.
--- @see config
+--- @param input wf.api.v1.process.IngredientOrFilename Input file data.
+--- @param config? table Configuration table.
+--- @return wf.api.v1.process.Ingredient output Converted file data.
+--- @see wf.api.v1.process.tools.lzsa.Config
 function M.compress2_block(input, config)
     return tool_run(input, {"-f", "2"}, config)
 end
 
 --- Decompress raw LZSA1 file data.
--- @tparam string input Input file data.
--- @tparam ?table config Configuration table.
--- @treturn string Converted file data.
--- @see config
+--- @param input wf.api.v1.process.IngredientOrFilename Input file data.
+--- @param config? table Configuration table.
+--- @return wf.api.v1.process.Ingredient output Converted file data.
+--- @see wf.api.v1.process.tools.lzsa.Config
 function M.decompress1(input, config)
     return tool_run(input, {"-d", "-r", "-f", "1"}, config)
 end
 
 --- Decompress raw LZSA2 file data.
--- @tparam string input Input file data.
--- @tparam ?table config Configuration table.
--- @treturn string Converted file data.
--- @see config
+--- @param input wf.api.v1.process.IngredientOrFilename Input file data.
+--- @param config? table Configuration table.
+--- @return wf.api.v1.process.Ingredient output Converted file data.
+--- @see wf.api.v1.process.tools.lzsa.Config
 function M.decompress2(input, config)
     return tool_run(input, {"-d", "-r", "-f", "2"}, config)
 end
 
 --- Decompress headered LZSA1 file data.
--- @tparam string input Input file data.
--- @tparam ?table config Configuration table.
--- @treturn string Converted file data.
--- @see config
+--- @param input wf.api.v1.process.IngredientOrFilename Input file data.
+--- @param config? table Configuration table.
+--- @return wf.api.v1.process.Ingredient output Converted file data.
+--- @see wf.api.v1.process.tools.lzsa.Config
 function M.decompress1_block(input, config)
     return tool_run(input, {"-d", "-f", "1"}, config)
 end
 
 --- Decompress headered LZSA2 file data.
--- @tparam string input Input file data.
--- @tparam ?table config Configuration table.
--- @treturn string Converted file data.
--- @see config
+--- @param input wf.api.v1.process.IngredientOrFilename Input file data.
+--- @param config? table Configuration table.
+--- @return wf.api.v1.process.Ingredient output Converted file data.
+--- @see wf.api.v1.process.tools.lzsa.Config
 function M.decompress2_block(input, config)
     return tool_run(input, {"-d", "-f", "2"}, config)
 end

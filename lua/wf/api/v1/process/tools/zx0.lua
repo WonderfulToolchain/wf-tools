@@ -2,8 +2,6 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
 --- <a href="https://github.com/WonderfulToolchain/salvador">wf-zx0-salvador</a> tool wrapper.
--- @module wf.api.v1.process.tools.zx0
--- @alias M
 
 local process = require("wf.api.v1.process")
 local path = require("pl.path")
@@ -37,18 +35,18 @@ local function tool_run(input, args, config)
 end
 
 --- ZX0 tool configuration.
--- @type zx0.Config
+--- @class wf.api.v1.process.tools.zx0.Config
 local config = {}
 
 --- Compress/decompress data backwards.
--- @treturn table Configuration table.
+--- @return wf.api.v1.process.tools.zx0.Config self Configuration table.
 function config:backward()
     self.data.backward = true
     return self
 end
 
 --- Enable verbose terminal output.
--- @treturn table Configuration table.
+--- @return wf.api.v1.process.tools.zx0.Config self Configuration table.
 function config:verbose()
     self.data.verbose = true
     return self
@@ -60,8 +58,8 @@ end
 local M = {}
 
 --- Create a configuration table.
--- @tparam ?table options Initial options.
--- @treturn table Configuration table.
+--- @param options? table Initial options.
+--- @return wf.api.v1.process.tools.zx0.Config self Configuration table.
 function M.config(options)
     local c = tablex.deepcopy(options or {})
     local result = {["data"]=c}
@@ -70,37 +68,37 @@ function M.config(options)
 end
 
 --- Compress file data to ZX0 (classic).
--- @tparam string input Input file data.
--- @tparam ?table config Configuration table.
--- @treturn string Converted file data.
--- @see config
+--- @param input wf.api.v1.process.IngredientOrFilename Input file data.
+--- @param config? table Configuration table.
+--- @return wf.api.v1.process.Ingredient output Converted file data.
+--- @see wf.api.v1.process.tools.zx0.Config
 function M.compress_classic(input, config)
     return tool_run(input, {"-classic"}, config)
 end
 
 --- Compress file data to ZX0.
--- @tparam string input Input file data.
--- @tparam ?table config Configuration table.
--- @treturn string Converted file data.
--- @see config
+--- @param input wf.api.v1.process.IngredientOrFilename Input file data.
+--- @param config? table Configuration table.
+--- @return wf.api.v1.process.Ingredient output Converted file data.
+--- @see wf.api.v1.process.tools.zx0.Config
 function M.compress(input, config)
     return tool_run(input, {}, config)
 end
 
 --- Decompress ZX0 (classic) file data.
--- @tparam string input Input file data.
--- @tparam ?table config Configuration table.
--- @treturn string Converted file data.
--- @see config
+--- @param input wf.api.v1.process.IngredientOrFilename Input file data.
+--- @param config? table Configuration table.
+--- @return wf.api.v1.process.Ingredient output Converted file data.
+--- @see wf.api.v1.process.tools.zx0.Config
 function M.decompress_classic(input, config)
     return tool_run(input, {"-d", "-classic"}, config)
 end
 
 --- Decompress ZX0 file data.
--- @tparam string input Input file data.
--- @tparam ?table config Configuration table.
--- @treturn string Converted file data.
--- @see config
+--- @param input wf.api.v1.process.IngredientOrFilename Input file data.
+--- @param config? table Configuration table.
+--- @return wf.api.v1.process.Ingredient output Converted file data.
+--- @see wf.api.v1.process.tools.zx0.Config
 function M.decompress(input, config)
     return tool_run(input, {"-d"}, config)
 end

@@ -2,8 +2,6 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
 --- wf-process helper functions
--- @module wf.api.v1.process
--- @alias M
 
 if _WFPROCESS == nil then
     error("not running inside wf-process")
@@ -16,38 +14,37 @@ local wfutil = require("wf.internal.util")
 local M = {}
 
 --- Binary data class; contains a "data" key with a binary data string.
--- @type process.Data
+--- @class wf.api.v1.process.Data
 M.Data = class()
 
 function M.Data:_init(data)
     self.data = data
 end
----
--- @section end
 
 --- File reference class; contains a "file" key with a filename string.
--- @type process.File
+--- @class wf.api.v1.process.File
 M.File = class()
 
 function M.File:_init(file)
     self.file = file
 end
----
--- @section end
+
+--- @alias wf.api.v1.process.Ingredient wf.api.v1.process.File|wf.api.v1.process.Data
+--- @alias wf.api.v1.process.IngredientOrFilename string|wf.api.v1.process.Ingredient
 
 local tmpfile_counter = 0
 --- Allocate a temporary file.
 -- This file will be deleted once wf-process finishes operation.
--- @tparam ?string ext File extension.
--- @treturn process.File Temporary file reference.
+--- @param ext? string File extension.
+--- @return wf.api.v1.process.File file Temporary file reference.
 function M.tmpfile(ext)
     tmpfile_counter = tmpfile_counter + 1
     return M.File(_WFPROCESS.temp_dir:path(string.format("wf%05d%s", tmpfile_counter, ext or "")))
 end
 
 --- Retrieve a filename from a string or file reference.
--- @tparam ?|string|process.File obj
--- @treturn ?string Filename.
+--- @param obj? string|wf.api.v1.process.File
+--- @return string? filename Filename.
 function M.filename(obj)
     if M.File:class_of(obj) then
         return obj.file
@@ -59,8 +56,8 @@ function M.filename(obj)
 end
 
 --- Convert a filename or reference to a file reference.
--- @tparam ?|string|process.Data|process.File obj Reference or filename. 
--- @treturn process.File File reference.
+--- @param obj? wf.api.v1.process.IngredientOrFilename Reference or filename. 
+--- @return wf.api.v1.process.File file File reference.
 function M.to_file(obj)
     if type(obj) == "table" then
         if M.File:class_of(obj) then
@@ -79,8 +76,8 @@ function M.to_file(obj)
 end
 
 --- Convert a binary data string or reference to a binary data reference.
--- @tparam ?|string|process.Data|process.File obj Reference or filename. 
--- @treturn process.Data Binary data reference.
+--- @param obj? wf.api.v1.process.IngredientOrFilename obj Reference or filename. 
+--- @return wf.api.v1.process.Data Binary data reference.
 function M.to_data(obj)
     if type(obj) == "table" then
         if M.Data:class_of(obj) then
@@ -100,8 +97,8 @@ end
 
 --- Return a list of inputs applicable to this execution of the script,
 -- optionally filtered by extension.
--- @tparam ?string ... Optional extensions to filter by.
--- @treturn {process.File,...} Table of process files.
+--- @param ... string Optional extensions to filter by.
+--- @return wf.api.v1.process.File ... Table of process files.
 function M.inputs(...)
     local args = {...}
     return _WFPROCESS.files(table.unpack(args))
@@ -110,15 +107,15 @@ end
 --- Access a file without opening or closing it.
 -- This is required to correctly emit Makefile dependency files, if a file
 -- is not accessed via Lua's "io" package (for example, by an external tool).
--- @tparam string name Filename, as in Lua's "io" package.
--- @tparam string mode File access mode, as in Lua's "io" package.
+--- @param name string Filename, as in Lua's "io" package.
+--- @param mode string File access mode, as in Lua's "io" package.
 function M.touch(name, mode)
     _WFPROCESS.access_file(M.filename(name), mode)
 end
 
 --- Create a symbol name from a string or file reference. Error if not possible.
--- @tparam string|process.File file File reference or filename.
--- @treturn string Symbol name.
+--- @param file string|wf.api.v1.process.File File reference or filename.
+--- @return string name Symbol name.
 function M.symbol(file)
     local filename = M.filename(file)
     if filename == nil then
@@ -129,8 +126,9 @@ function M.symbol(file)
 end
 
 --- Emit a symbol accessible to C code.
--- @tparam string|process.File name Symbol name; can be generated automaticaly from an input file.
--- @tparam string|table|process.Data|process.File data Data to emit.
+--- @param name string|wf.api.v1.process.File name Symbol name; can be generated automaticaly from an input file.
+--- @param data string|table|wf.api.v1.process.Ingredient data Data to emit.
+--- @param options? table
 function M.emit_symbol(name, data, options)
     if M.File:class_of(name) then
         name = _WFPROCESS.bin2c_default_prefix .. M.symbol(name)

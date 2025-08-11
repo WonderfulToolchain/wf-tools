@@ -2,8 +2,6 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
 --- <a href="https://github.com/WonderfulToolchain/SuperFamiconv">wf-superfamiconv</a> tool wrapper.
--- @module wf.api.v1.process.tools.superfamiconv
--- @alias M
 
 local process = require("wf.api.v1.process")
 local path = require("pl.path")
@@ -60,7 +58,7 @@ local function tool_run(command, inputs, output_mode, config)
             if config.bpp then table.insert(args, "-B") table.insert(args, tostring(config.bpp)) end
         end
         if command == "tiles" then
-            if config.max_tiles then table.insert(args, "-T") table.insert(args, tostring(max_tiles)) end
+            if config.max_tiles then table.insert(args, "-T") table.insert(args, tostring(config.max_tiles)) end
         end
         if command == "map" then
             if config.palette_base then table.insert(args, "-P") table.insert(args, tostring(config.palette_base)) end
@@ -80,11 +78,11 @@ local function tool_run(command, inputs, output_mode, config)
 end
 
 --- SuperFamiconv tool configuration.
--- @type superfamiconv.Config
+--- @class wf.api.v1.process.tools.superfamiconv.Config
 local config = {}
 
 --- Select target mode/platform.
--- @tparam string mode Mode/platform:<br>
+--- @param mode string Mode/platform:<br>
 -- <ul><li>snes</li>
 -- <li>snes_mode7</li>
 -- <li>gb</li>
@@ -97,45 +95,45 @@ local config = {}
 -- <li>ws</li>
 -- <li>wsc</li>
 -- <li>wsc_packed</li></ul>
--- @treturn table Configuration table.
+--- @return wf.api.v1.process.tools.superfamiconv.Config self Configuration table.
 function config:mode(mode)
     self.data.mode = mode
     return self
 end
 
 --- Select output bits per pixel.
--- @tparam number bpp Bits per pixel.
--- @treturn table Configuration table.
+--- @param bpp number Bits per pixel.
+--- @return wf.api.v1.process.tools.superfamiconv.Config self Configuration table.
 function config:bpp(bpp)
     self.data.bpp = bpp
     return self
 end
 
 --- Select output tile size.
--- @tparam number width Tile width.
--- @tparam number height Tile height.
--- @treturn table Configuration table.
+--- @param width number Tile width.
+--- @param height number Tile height.
+--- @return wf.api.v1.process.tools.superfamiconv.Config self Configuration table.
 function config:tile_size(width, height)
     self.data.tile_size = {width, height}
     return self
 end
 
 --- Disable color remapping.
--- @treturn table Configuration table.
+--- @return wf.api.v1.process.tools.superfamiconv.Config self Configuration table.
 function config:no_remap()
     self.data.no_remap = true
     return self
 end
 
 --- Disable discarding redundant tiles.
--- @treturn table Configuration table.
+--- @return wf.api.v1.process.tools.superfamiconv.Config self Configuration table.
 function config:no_discard()
     self.data.no_discard = true
     return self
 end
 
 --- Disable horizontal/vertical tile flipping.
--- @treturn table Configuration table.
+--- @return wf.api.v1.process.tools.superfamiconv.Config self Configuration table.
 function config:no_flip()
     self.data.no_flip = true
     return self
@@ -143,7 +141,7 @@ end
 
 --- Disable all tilemap optimizations; assume the image
 -- is a direct representation of the desired tiles.
--- @treturn table Configuration table.
+--- @return wf.api.v1.process.tools.superfamiconv.Config self Configuration table.
 function config:tile_direct()
     self.data.no_remap = true
     self.data.no_discard = true
@@ -152,24 +150,24 @@ function config:tile_direct()
 end
 
 --- Apply sprite output settings.
--- @treturn table Configuration table.
+--- @return wf.api.v1.process.tools.superfamiconv.Config self Configuration table.
 function config:sprite_mode()
     self.data.sprite_mode = true
     return self
 end
 
 --- Set a maximum number of tiles.
--- @tparam number count Tile count.
--- @treturn table Configuration table.
+--- @param count number Tile count.
+--- @return wf.api.v1.process.tools.superfamiconv.Config self Configuration table.
 function config:max_tiles(count)
     self.data.max_tiles = count
     return self
 end
 
 --- Split a palette into subpalettes.
--- @tparam number palettes Number of palettes.
--- @tparam number colors Colors per subpalette.
--- @treturn table Configuration table.
+--- @param palettes number Number of palettes.
+--- @param colors number Colors per subpalette.
+--- @return wf.api.v1.process.tools.superfamiconv.Config self Configuration table.
 function config:subpalettes(palettes, colors)
     self.data.palettes = palettes
     self.data.colors = colors
@@ -177,43 +175,43 @@ function config:subpalettes(palettes, colors)
 end
 
 --- Configure color #0.
--- @tparam string value Color value.
--- @treturn table Configuration table.
+--- @param value string Color value.
+--- @return wf.api.v1.process.tools.superfamiconv.Config self Configuration table.
 function config:color_zero(value)
     self.data.color_zero = value
     return self
 end
 
 --- Set base tile offset.
--- @tparam number offset Offset.
--- @treturn table Configuration table.
+--- @param offset number Offset.
+--- @return wf.api.v1.process.tools.superfamiconv.Config self Configuration table.
 function config:tile_base(offset)
     self.data.tile_base = offset
     return self
 end
 
 --- Set base palette offset.
--- @tparam number offset Offset.
--- @treturn table Configuration table.
+--- @param offset number Offset.
+--- @return wf.api.v1.process.tools.superfamiconv.Config self Configuration table.
 function config:palette_base(offset)
     self.data.palette_base = offset
     return self
 end
 
 --- Set output map size.
--- @tparam number width Width.
--- @tparam number height Height.
--- @treturn table Configuration table.
+--- @param width number Width.
+--- @param height number Height.
+--- @return wf.api.v1.process.tools.superfamiconv.Config self Configuration table.
 function config:map_size(width, height)
     self.data.map_size = {width, height}
     return self
 end
 
 --- Split output map into columns and rows of specified size.
--- @tparam number width Width.
--- @tparam number height Height.
--- @tparam ?boolean column_order If true, use column-major order to output map data.
--- @treturn table Configuration table.
+--- @param width number Width.
+--- @param height number Height.
+--- @param column_order? boolean If true, use column-major order to output map data.
+--- @return wf.api.v1.process.tools.superfamiconv.Config self Configuration table.
 function config:split_map(width, height, column_order)
     self.data.map_split = {width, height}
     self.data.map_column_order = column_order or false
@@ -221,7 +219,7 @@ function config:split_map(width, height, column_order)
 end
 
 --- Enable verbose terminal output.
--- @treturn table Configuration table.
+--- @return wf.api.v1.process.tools.superfamiconv.Config self Configuration table.
 function config:verbose()
     self.data.verbose = true
     return self
@@ -229,14 +227,11 @@ end
 
 config.__index = config
 
----
--- @section end
-
 local M = {}
 
 --- Create a configuration table.
--- @tparam ?table options Initial options.
--- @treturn table Configuration table.
+--- @param options? table Initial options.
+--- @return wf.api.v1.process.tools.superfamiconv.Config config Configuration table.
 function M.config(options)
     local c = tablex.deepcopy(options or {})
     local result = {["data"]=c}
@@ -245,40 +240,44 @@ function M.config(options)
 end
 
 --- Convert image data to raw palette data.
--- @tparam string input Input image data.
--- @tparam ?table config Configuration table.
--- @treturn string Converted raw palette data.
--- @see config
+--- @param input wf.api.v1.process.IngredientOrFilename Input image data.
+--- @param config? table Configuration table.
+--- @return wf.api.v1.process.Ingredient output Converted raw palette data.
+--- @see wf.api.v1.process.tools.superfamiconv.Config
 function M.palette(input, config)
     return tool_run("palette", {["i"]=input}, "d", config)
 end
 
 --- Convert image data to raw tile data.
--- @tparam string input Input image data.
--- @tparam string palette Input palette data.
--- @tparam ?table config Configuration table.
--- @treturn string Converted raw tile data.
--- @see config
+--- @param input wf.api.v1.process.IngredientOrFilename Input image data.
+--- @param palette wf.api.v1.process.IngredientOrFilename Input palette data.
+--- @param config? table Configuration table.
+--- @return wf.api.v1.process.Ingredient output Converted raw tile data.
+--- @see wf.api.v1.process.tools.superfamiconv.Config
 function M.tiles(input, palette, config)
     return tool_run("tiles", {["i"]=input, ["p"]=palette}, "d", config)
 end
 
 --- Convert image data to raw map data.
--- @tparam string input Input image data.
--- @tparam string palette Input palette data.
--- @tparam string tiles Input tile data.
--- @tparam ?table config Configuration table.
--- @treturn string Converted raw map data.
--- @see config
+--- @param input wf.api.v1.process.IngredientOrFilename Input image data.
+--- @param palette wf.api.v1.process.IngredientOrFilename Input palette data.
+--- @param tiles wf.api.v1.process.IngredientOrFilename Input tile data.
+--- @param config? table Configuration table.
+--- @return wf.api.v1.process.Ingredient output Converted raw map data.
+--- @see wf.api.v1.process.tools.superfamiconv.Config
 function M.map(input, palette, tiles, config)
     return tool_run("map", {["i"]=input, ["p"]=palette, ["t"]=tiles}, "d", config)
 end
 
+--- @class wf.api.v1.process.tools.superfamiconv.TilesetOutput
+--- @field palette wf.api.v1.process.Ingredient Converted raw palette data.
+--- @field tiles wf.api.v1.process.Ingredient Converted raw tile data.
+
 --- Convert image data to palette and tile data.
--- @tparam string input Input image data.
--- @tparam ?table config Configuration table.
--- @treturn table Converted raw palette, tiles, and map data.
--- @see config
+--- @param input wf.api.v1.process.IngredientOrFilename Input image data.
+--- @param config? table Configuration table.
+--- @return wf.api.v1.process.tools.superfamiconv.TilesetOutput outputs Converted raw palette, tiles, and map data.
+--- @see wf.api.v1.process.tools.superfamiconv.Config
 function M.convert_tileset(input, config)
     local palette = M.palette(input, config)
     local tiles = M.tiles(input, palette, config)
@@ -288,11 +287,16 @@ function M.convert_tileset(input, config)
     }
 end
 
+--- @class wf.api.v1.process.tools.superfamiconv.TilemapOutput
+--- @field palette wf.api.v1.process.Ingredient Converted raw palette data.
+--- @field tiles wf.api.v1.process.Ingredient Converted raw tile data.
+--- @field map wf.api.v1.process.Ingredient Converted raw map data.
+
 --- Convert image data to palette, tile and map data.
--- @tparam string input Input image data.
--- @tparam ?table config Configuration table.
--- @treturn table Converted raw palette, tiles, and map data.
--- @see config
+--- @param input wf.api.v1.process.IngredientOrFilename Input image data.
+--- @param config? table Configuration table.
+--- @return wf.api.v1.process.tools.superfamiconv.TilemapOutput output Converted raw palette, tiles, and map data.
+--- @see wf.api.v1.process.tools.superfamiconv.Config
 function M.convert_tilemap(input, config)
     local palette = M.palette(input, config)
     local tiles = M.tiles(input, palette, config)
