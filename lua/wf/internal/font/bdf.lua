@@ -4,11 +4,46 @@
 local stringx = require("pl.stringx")
 
 --- BDF glyph loader.
--- @module wf.internal.font.bdf
--- @alias M
 
 local M = {}
 
+--- @class wf.api.internal.font.bdf.Char BDF character data
+--- @field name string
+--- @field encoding? number
+--- @field swx0? number
+--- @field swy0? number
+--- @field dwx0? number
+--- @field dwy0? number
+--- @field swx1? number
+--- @field swy1? number
+--- @field dwx1? number
+--- @field dwy1? number
+--- @field x? number
+--- @field y? number
+--- @field width? number
+--- @field height? number
+--- @field bitmap? number[]
+
+--- @class wf.api.internal.font.bdf.Font BDF font data
+--- @field bdf_version? string BDF version
+--- @field name? string
+--- @field pointsize? number
+--- @field xdpi? number
+--- @field ydpi? number
+--- @field x? number
+--- @field y? number
+--- @field width? number
+--- @field height? number
+--- @field ascent? number
+--- @field descent? number
+--- @field family? string
+--- @field weight? string
+--- @field version? string
+--- @field copyright? string
+--- @field foundry? string
+--- @field chars wf.api.internal.font.bdf.Char[]
+
+--- @return wf.api.internal.font.bdf.Font
 M.parse = function(filename)
     local font = {
         ["chars"] = {}

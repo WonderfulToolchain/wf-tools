@@ -2,16 +2,14 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
 --- Math-related utilities.
--- @module wf.internal.math
--- @alias M
 
 local M = {}
 
 --- Align a number (by incrementing) or string (by padding with zeroes) up to a specified alignment.
--- @tparam number|string value The value to be aligned.
--- @tparam number alignment The alignment.
--- @tparam ?number pad_value The padding value, for strings.
--- @treturn number|string The aligned value.
+--- @param value number|string The value to be aligned.
+--- @param alignment number The alignment.
+--- @param pad_value? number The padding value, for strings.
+--- @return number|string result The aligned value.
 function M.pad_alignment_to(value, alignment, pad_value)
     if type(value) == "number" then
         return math.floor(math.ceil(value / alignment) * alignment)
@@ -24,9 +22,9 @@ function M.pad_alignment_to(value, alignment, pad_value)
 end
 
 --- Provide the next power of two for a given value.
--- @tparam number i The given value.
--- @tparam ?number min_size The minimum output value.
--- @treturn number The next power of two for the given value.
+--- @param i number The given value.
+--- @param min_size? number The minimum output value.
+--- @return number result The next power of two for the given value.
 function M.next_power_of_two(i, min_size)
     min_size = min_size or 0
     if i < min_size then
@@ -43,8 +41,8 @@ function M.next_power_of_two(i, min_size)
 end
 
 --- Convert a binary-coded decimal to a value.
--- @tparam number value The given value.
--- @treturn number The binary-coded value.
+--- @param value number The given value.
+--- @return number result The binary-coded value.
 function M.from_bcd(value)
     local result = 0
     local offset = 1
@@ -57,9 +55,9 @@ function M.from_bcd(value)
 end
 
 --- Convert a value to a binary-coded decimal.
--- @tparam number value The given value.
--- @tparam ?number bits The amount of bits taken into account for conversion.
--- @treturn number The binary-coded value.
+--- @param value number The given value.
+--- @param bits? number The amount of bits taken into account for conversion.
+--- @return number result The binary-coded value.
 function M.to_bcd(value, bits)
     bits = bits or 64
     local result = 0

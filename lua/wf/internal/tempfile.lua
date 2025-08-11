@@ -30,13 +30,13 @@ end
 
 local tmp_directory_parent = path.abspath(path.join(os.tmpname(), ".."))
 --- Returns true if the provided path is in a temporary directory.
--- @tparam string dir Directory/file path to check.
+--- @param dir string Directory/file path to check.
 M.is_in_temp_path = function(dir)
     return stringx.startswith(path.abspath(dir), tmp_directory_parent .. path.sep)
 end
 
 --- Create a temporary directory, which supports automatic tree removal using a to-be-closed variable.
--- @tparam ?boolean auto_remove If explicitly set to false, the directory will not be automatically deleted.
+--- @param auto_remove? boolean If explicitly set to false, the directory will not be automatically deleted.
 M.create_directory = function(auto_remove)
     auto_remove = auto_remove ~= false and true or false
 

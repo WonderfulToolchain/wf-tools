@@ -42,9 +42,9 @@ M.base = base_path
 M.base_name = base_dir
 
 --- Generate an absolute path to the given executable.
--- @tparam string binary_name The executable name.
--- @tparam ?string subpath The subpath, if any; for example, a subpath of "others" resolves to "/opt/wonderful/others/bin".
--- @treturn string The absolute path to the given executable.
+--- @param binary_name string The executable name.
+--- @param subpath? string The subpath, if any; for example, a subpath of "others" resolves to "/opt/wonderful/others/bin".
+--- @return string path The absolute path to the given executable.
 function M.executable(binary_name, subpath)
     if subpath then
         subpath = subpath:gsub("/", dir_separator) .. dir_separator

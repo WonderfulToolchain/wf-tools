@@ -11,8 +11,8 @@ local wfutil = require("wf.internal.util")
 local M = {}
 
 --- Check if a package is installed.
--- @tparam string name The name of the package.
--- @treturn bool True if the package is installed.
+--- @param name string The name of the package.
+--- @return boolean result True if the package is installed.
 function M.installed(name)
     local success = wfutil.execute(
         wfpath.executable("wf-pacman"), {"-Qs", name},

@@ -70,7 +70,7 @@ function M.to_c_identifier(s)
 end
 
 --- Get the current script name.
--- @treturn string The current script name.
+--- @return string name The current script name.
 function M.script_name()
     if arg then
         return arg[0]:gsub(".+[\\/]", ""):gsub("%.%w+$", "")
