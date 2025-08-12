@@ -2,8 +2,6 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
 --- Helpers for the "wswan" target.
--- @module wf.internal.platform.wswan
--- @alias M
 
 local wfmath = require("wf.internal.math")
 local M = {}
@@ -64,9 +62,9 @@ M.EEPROM_SIZE_BY_TYPE = {
 }
 
 --- Fast method to calculate the ROM checksum for a repeated byte.
--- @tparam number pad The padding byte value.
--- @tparam number count The number of occurences of the given byte.
--- @treturn number The calculated checksum.
+--- @param pad number The padding byte value.
+--- @param count number The number of occurences of the given byte.
+--- @return number checksum The calculated checksum.
 function M.calculate_rom_padding_checksum(pad, count)
     if count < 0 then
         error("invalid pad count: " .. count)
@@ -75,8 +73,8 @@ function M.calculate_rom_padding_checksum(pad, count)
 end
 
 --- Calculate the ROM checksum for the provided values.
--- @tparam string|table|number ... Checksum component.
--- @treturn number The calculated checksum.
+--- @param ... string|table|number Checksum component.
+--- @return number checksum The calculated checksum.
 function M.calculate_rom_checksum(...)
     local arg = {...}
     local checksum = 0
@@ -109,9 +107,9 @@ function M.get_save_type(settings)
 end
 
 --- Create a ROM header for the specified checksum and settings.
--- @tparam number checksum The checksum for the ROM, excluding the header.
--- @tparam table settings The settings.
--- @treturn string The ROM header.
+--- @param checksum number The checksum for the ROM, excluding the header.
+--- @param settings table The settings.
+--- @return string header The ROM header.
 function M.create_rom_header(checksum, settings)
     local maintenance = settings.maintenance or 0x00
     if settings.disable_custom_boot_splash then

@@ -2,8 +2,6 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2024
 
 --- Logging library.
--- @module wf.internal.log
--- @alias M
 
 local M = {}
 

@@ -52,9 +52,6 @@ function config:verbose()
     return self
 end
 
----
--- @section end
-
 local M = {}
 
 --- Create a configuration table.

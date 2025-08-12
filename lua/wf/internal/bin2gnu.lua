@@ -2,8 +2,6 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
 --- .c/.s/.h file generator.
--- @module wf.internal.bin2gnu
--- @alias M
 
 local M = {}
 

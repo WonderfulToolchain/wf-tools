@@ -2,8 +2,6 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
 --- Lua 5.4+ temporary file library.
--- @module wf.internal.tempfile
--- @alias M
 
 local compat = require("pl.compat")
 local dir = require('pl.dir')

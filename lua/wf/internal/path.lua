@@ -2,8 +2,6 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
 --- Path querying.
--- @module wf.internal.path
--- @alias M
 
 local compat = require("pl.compat")
 local dir = require("pl.dir")

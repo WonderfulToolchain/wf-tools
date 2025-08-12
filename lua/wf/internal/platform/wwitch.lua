@@ -2,8 +2,6 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
 --- Helpers for the "wwitch" target.
--- @module wf.internal.platform.wwitch
--- @alias M
 
 local wfmath = require("wf.internal.math")
 local wfstring = require("wf.internal.string")
@@ -22,8 +20,8 @@ M.FILE_ATTRIBUTE_FLAGS = {
 }
 
 --- Convert file attributes to their integer value.
--- @tparam mode number|string Input file attribute value.
--- @treturn number Output file attribute value.
+--- @param number|string mode Input file attribute value.
+--- @return number value Output file attribute value.
 function M.file_attributes_to_integer(mode)
     if type(mode) == "number" then
         return mode

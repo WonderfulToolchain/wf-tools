@@ -2,8 +2,6 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
 --- ELF file parser.
--- @module wf.internal.elf
--- @alias M
 
 local class = require('pl.class')
 

@@ -2,7 +2,6 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2018, 2023
 
 --- CP437 -> UTF-8 character mapping.
--- @module wf.charmap.cp437.utf8
 
 return {
 	[0x00] = 0x0020,

@@ -2,8 +2,6 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
 --- Package management/querying utilities.
--- @module wf.internal.package
--- @alias M
 
 local stringx = require("pl.stringx")
 local wfpath = require("wf.internal.path")

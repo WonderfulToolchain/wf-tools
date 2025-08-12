@@ -2,8 +2,6 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
 --- Helpers for the "psx" target.
--- @module wf.internal.platform.psx
--- @alias M
 
 local wfmath = require("wf.internal.math")
 local M = {}

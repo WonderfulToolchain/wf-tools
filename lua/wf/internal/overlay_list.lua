@@ -1,9 +1,6 @@
 -- SPDX-License-Identifier: MIT
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
--- @module wf.internal.overlay_list
--- @alias M
-
 local M = {}
 
 M.create = function(combinations)

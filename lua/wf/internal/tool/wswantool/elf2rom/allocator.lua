@@ -1,9 +1,6 @@
 -- SPDX-License-Identifier: MIT
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
--- @module wf.internal.tool.wswantool.romlink.allocator
--- @alias M
-
 local class = require("pl.class")
 local tablex = require("pl.tablex")
 

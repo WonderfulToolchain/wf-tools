@@ -2,8 +2,6 @@
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
 --- Assorted utilities.
--- @module wf.internal.util
--- @alias M
 
 local utils = require("pl.utils")
 local M = {}
