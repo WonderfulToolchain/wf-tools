@@ -7,7 +7,8 @@ local M = {}
 
 local function print_error(level, message)
     local info = debug.getinfo(3, "Sl")
-    print(level .. ": " .. info.short_src .. ":" .. info.currentline .. ": " .. message)
+    io.stderr:write(level .. ": " .. info.short_src .. ":" .. info.currentline .. ": " .. message .. "\n")
+    io.stderr:flush()
 end
 
 M.verbose = false
