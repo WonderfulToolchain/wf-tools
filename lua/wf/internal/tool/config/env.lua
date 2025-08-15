@@ -18,7 +18,7 @@ local TYPE_STRING = "string"
 local TYPE_PATH = "path"
 local TYPE_LIST = "list"
 
-local function env_set(name, value, type)
+local function env_set(name, value, type, suffix)
     -- FIXME: On MSYS2, we receive Windows paths, but should be outputting Unix paths.
     if compat.is_windows then
         if type == TYPE_PATH then
@@ -29,8 +29,13 @@ local function env_set(name, value, type)
             value = stringx.strip(stdout)
         end
     end
-    wflog.info("setting " .. name .. " = \"" .. value .. "\"")
-    print("export " .. name .. "='" .. value .. "'")
+    if suffix then
+        wflog.info("setting " .. name .. " = \"" .. value .. suffix .. "\"")
+        print("export " .. name .. "='" .. value .. "'" .. suffix)
+    else
+        wflog.info("setting " .. name .. " = \"" .. value .. "\"")
+        print("export " .. name .. "='" .. value .. "'")
+    end
 end
 
 local function env_add_subpaths(paths, parent, bindir)
@@ -52,13 +57,17 @@ local function env_run(args)
         paths = env_add_subpaths(paths, path.join(wfpath.base, "toolchain"), "bin")
     end
 
-    new_paths = tablex.makeset(paths)
-    for _, p in pairs(stringx.split(os.getenv("PATH"), env_path_separator)) do
-        if not new_paths[p] then
-            table.insert(paths, p)
+    if args.independent then
+        env_set("PATH", stringx.join(env_path_separator, paths), TYPE_LIST, env_path_separator .. "$PATH")
+    else
+        new_paths = tablex.makeset(paths)
+        for _, p in pairs(stringx.split(os.getenv("PATH"), env_path_separator)) do
+            if not new_paths[p] then
+                table.insert(paths, p)
+            end
         end
+        env_set("PATH", stringx.join(env_path_separator, paths), TYPE_LIST)
     end
-    env_set("PATH", stringx.join(env_path_separator, paths), TYPE_LIST)
 
     if wfpackage.installed("blocksds-toolchain") then
         env_set("BLOCKSDS", path.join(wfpath.base, "thirdparty", "blocksds", "core"), TYPE_PATH)
@@ -69,10 +78,12 @@ end
 return {
     ["generate"] = {
         ["arguments"] = [[
-    ...: generate script to set environment variables
+...: generate script to set environment variables
 
-    -a,--all                         Add all toolchains to PATH.
-    -v,--verbose                     Enable verbose logging.
+  -a,--all                         Add all toolchains to PATH.
+  -i,--independent                 Avoid overwriting contents of existing
+                                   environment variables.
+  -v,--verbose                     Enable verbose logging.
 ]],
         ["description"] = "generate script to set environment variables",
         ["run"] = env_run
