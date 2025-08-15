@@ -73,7 +73,7 @@ return {
 
     -a,--all                         Add all toolchains to PATH.
     -v,--verbose                     Enable verbose logging.
-    ]],
+]],
         ["description"] = "generate script to set environment variables",
         ["run"] = env_run
     }
