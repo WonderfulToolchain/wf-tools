@@ -334,7 +334,7 @@ local function try_place_entry_inner(banks, entry)
         local joined_start_bank = joined_linear_start // bank.size
         local joined_start_offset = joined_linear_start % bank.size
         local joined_end_bank = (joined_linear_end - 1) // bank.size
-        local joined_end_offset = (joined_linear_end - 1) % bank.size
+        -- local joined_end_offset = (joined_linear_end - 1) % bank.size
         local bank_count = joined_end_bank + 1 - joined_start_bank
 
         if limit and bank_count > limit then
@@ -362,7 +362,7 @@ local function try_place_entry_inner(banks, entry)
         entry.bank = joined_start_bank
         entry.offset = joined_start_offset
         pos = 1
-        local sentry = tablex.deepcopy(entry)
+        sentry = tablex.deepcopy(entry)
         for i = 1,bank_count do
             sentry.parent = entry
             sentry.parent_offset = pos - 1
@@ -382,7 +382,7 @@ local function try_place_entry_inner(banks, entry)
     end
 end
 
-local function try_place_entry(banks, entry)
+local function try_place_entry_a(banks, entry)
     banks = banks[entry.type]
 
     if entry.type == 2 and entry.bank ~= nil and entry.offset ~= nil then
@@ -401,14 +401,14 @@ local function try_place_entry(banks, entry)
         end
     elseif entry.bank == nil then
         if entry.type < -1 then
-            for i, v in tablex.sort(banks, function(a, b) return a < b end) do
+            for i, _ in tablex.sort(banks, function(a, b) return a < b end) do
                 entry.bank = i
                 if try_place_entry_inner(banks, entry) then
                     return true
                 end
             end
         else
-            for i, v in tablex.sort(banks, function(a, b) return a > b end) do
+            for i, _ in tablex.sort(banks, function(a, b) return a > b end) do
                 entry.bank = i
                 if try_place_entry_inner(banks, entry) then
                     return true
@@ -419,6 +419,29 @@ local function try_place_entry(banks, entry)
     end
 
     return try_place_entry_inner(banks, entry)
+end
+
+local function try_place_entry(config, banks, entry)
+    -- HACK: This should really be done in a better way.
+    if config.bootrom_area_reserved and entry.type == 2 then
+        for i, v in pairs(banks[2]) do
+            if (i & 0xF) == 0xF then
+                v.size = 65536 - 8192
+            end
+        end
+    end
+
+    local result = try_place_entry_a(banks, entry)
+
+    if config.bootrom_area_reserved and entry.type == 2 then
+        for i, v in pairs(banks[2]) do
+            if (i & 0xF) == 0xF then
+                v.size = 65536
+            end
+        end
+    end
+
+    return result
 end
 
 local function calculate_bank_sizes(banks)
@@ -499,7 +522,7 @@ function Allocator:allocate(config, is_final)
 
     -- Add fixed entries, as we know exactly where they need to go.
     for i, entry in pairs(self.fixed_entries) do
-        if not try_place_entry(banks, entry) then
+        if not try_place_entry(config, banks, entry) then
             error("could not allocate: " .. get_entry_name(entry))
         end
     end
@@ -530,7 +553,7 @@ function Allocator:allocate(config, is_final)
     end)
 
     for i, entry in pairs(self.entries) do
-        if not try_place_entry(banks, entry) then
+        if not try_place_entry(config, banks, entry) then
             error("could not allocate: " .. get_entry_name(entry))
         end
     end

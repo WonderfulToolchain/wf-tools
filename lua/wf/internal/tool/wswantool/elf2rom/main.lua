@@ -300,7 +300,7 @@ local function build_iram_data(iram, platform)
 
     data = build_iram_data_push(data, joined_entry, platform)
     data = data .. string.char(0) .. string.char(0)
-    if #data > 65520 then
+    if #data > 0xFFF0 then
         log.error("IRAM data block too large")
     end
     return data
@@ -323,11 +323,11 @@ local function run_linker(args, platform)
     local allocator_config = {
         ["iram_size"] = 65536,
         ["sram_size"] = 0,
-        ["rom_banks"] = 0
+        ["rom_banks"] = 0,
+        ["bootrom_area_reserved"] = config.cartridge.rom_reserve_bootrom_area or false
     }
 
     local elf_file <close> = io.open(args.input, "rb")
-    local elf_file_root, elf_file_ext = path.splitext(args.input)
     local elf = wfelf.ELF(elf_file, wfelf.ELFCLASS32, wfelf.ELFDATA2LSB, wfelf.EM_386)
 
     local default_alloc_type = nil
@@ -412,7 +412,6 @@ local function run_linker(args, platform)
     -- Allocate sections.
     local sections = {}
     local sections_by_name = {}
-    local symbols = {} -- {section, offset}
     local shstrtab = elf.shdr[elf.shstrndx + 1]
     local strtab, symtab
 
@@ -494,8 +493,9 @@ local function run_linker(args, platform)
                 elseif is_force_retain then
                     retained_sections[section_entry.input_index] = true
                 end
-                if #data > 0xFFF0 then
-                    section_entry.align = 16
+                if #data > 0xFFF1 then
+                    -- ensure memory cell ((offset & 15) + #data - 1) is always reachable via alignment
+                    section_entry.align = wfmath.next_power_of_two(#data - 0xFFF0)
                 end
             end
             sections_by_name[section_entry.name] = section_entry
@@ -592,16 +592,14 @@ local function run_linker(args, platform)
         local section_children = {} -- section: {sections...}
 
         for i, relocation in pairs(relocations) do
-            local r_offset = relocation.offset
-            local r_type = relocation.type
             local target_section = relocation.section
             local symbol = relocation.symbol
             
-            if relocation.symbol[1] ~= nil then
+            if symbol[1] ~= nil then
                 -- the symbol in this section...
-                local child_id = relocation.symbol[1].input_index
+                local child_id = symbol[1].input_index
                 -- ... is relocated in this section.
-                local parent_id = relocation.section.input_index
+                local parent_id = target_section.input_index
                 if parent_id ~= nil and child_id ~= nil then
                     if section_children[parent_id] == nil then
                         section_children[parent_id] = {}
@@ -615,7 +613,7 @@ local function run_linker(args, platform)
         retained_sections = {}
         while next(new_retained_sections) ~= nil do
             local next_retained_sections = {}
-            for i,v in pairs(new_retained_sections) do
+            for i, _ in pairs(new_retained_sections) do
                 retained_sections[i] = true
 
                 if section_children[i] ~= nil then
@@ -646,7 +644,7 @@ local function run_linker(args, platform)
         end
     end
     
-    for i, v in pairs(allocated_sections) do
+    for _, v in pairs(allocated_sections) do
         if v.segment == nil then
             allocator:add(v)
         end
@@ -656,7 +654,7 @@ local function run_linker(args, platform)
     end
     allocator:allocate(allocator_config, false)
 
-    for i, v in pairs(sections) do
+    for _, v in pairs(sections) do
         if v.segment ~= nil then
             v.type = v.segment.type
             v.bank = v.segment.bank
@@ -699,7 +697,7 @@ local function run_linker(args, platform)
 
     -- Apply relocations.
     local symbols_not_found = {}
-    for i, relocation in pairs(relocations) do
+    for _, relocation in pairs(relocations) do
         local r_offset = relocation.offset
         local r_type = relocation.type
         local target_section = relocation.section
@@ -737,7 +735,7 @@ local function run_linker(args, platform)
         end
 
         if symbol_found then
-            local linear, segment, offset = get_linear_logical_address(symbol)
+            local linear, segment, _ = get_linear_logical_address(symbol)
             if r_type == wfelf.R_386_OZSEG16 then
                 target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v + segment end)
             else
@@ -921,10 +919,10 @@ local function run_linker(args, platform)
                 if section ~= nil and section.input_alloc then
                     local section_name = wfelf.read_string(elf_file, shstrtab, shdr.name)
                     local section_symbol = {section, nil, ""}
-                    
+
                     local address = get_vma_address(section_symbol)
                     if stringx.endswith(section_name, "!") then
-                        local linear, segment, offset = get_linear_logical_address(section_symbol)
+                        local _, segment, _ = get_linear_logical_address(section_symbol)
                         shdr.addr = (address & 0xFFF00000) | (segment << 4)
                     elseif stringx.endswith(section_name, "&") then
                         shdr.addr = (address & 0xFFF00000) | ((address + #section.data) & 0x000FFFFF)
@@ -958,7 +956,7 @@ local function run_linker(args, platform)
                 symtab.offset = offset
                 out_file:seek("set", offset)
 
-                for i, sym in pairs(symbols) do
+                for _, sym in pairs(symbols) do
                     local shndx = wfelf.SHN_ABS
                     if sym[2] ~= nil then
                         if sym[2].shndx ~= nil then
