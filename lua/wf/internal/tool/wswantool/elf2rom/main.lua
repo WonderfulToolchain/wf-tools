@@ -487,10 +487,10 @@ local function run_linker(args, platform)
                     else
                         section_entry.type = wfallocator.IRAM
                     end
-                    if (shdr.flags & wfelf.SHF_GNU_RETAIN) ~= 0 then
-                        retained_sections[section_entry.input_index] = true
-                    end
                 elseif is_force_retain then
+                    retained_sections[section_entry.input_index] = true
+                end
+                if (shdr.flags & wfelf.SHF_GNU_RETAIN) ~= 0 then
                     retained_sections[section_entry.input_index] = true
                 end
                 if #data > 0xFFF1 then
