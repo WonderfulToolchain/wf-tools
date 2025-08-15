@@ -52,45 +52,52 @@ local bin2c_processor = function(obj) end
 
 if _WFPROCESS.target[1] == "wswan" then
     bin2c_processor = function(obj, key)
-        local section = ""
         if _WFPROCESS.target[2] ~= "bootfriend" then
             obj.align = obj.options.align or 2
             obj.address_space = "__wf_rom"
-            if _WFPROCESS.format == ".s" then
-                section = ".farrodata"
-            end
-            if obj.options.section == nil
-            and (obj.options.bank == 0 or obj.options.bank == 1 or obj.options.bank == "0" or obj.options.bank == "1" or obj.options.bank == "L") then
-                section = ".rom" .. obj.options.bank
-                if obj.options.bank_index ~= nil then
-                    local index = obj.options.bank_index
-                    if type(index) == "number" then index = string.format("%X", index) end
-                    section = section .. "_" .. index
-                    if obj.options.bank_offset ~= nil then
-                        index = obj.options.bank_offset
-                        if type(index) == "number" then index = string.format("%X", index) end
-                        section = section .. "_" .. index
-                    end
-                end
-                obj.bank = true
-            end
-        else
-            if _WFPROCESS.format == ".s" then
-                section = ".rodata"
-            end
-        end
-        if section ~= "" then
-            obj.section = section .. ".a." .. key
         end
         obj.hide_size_from_header = #(obj.data) > 32767
+        
+        obj.section = obj.options.section
+        if obj.section == nil then
+            local section = ""
+            if _WFPROCESS.target[2] ~= "bootfriend" then
+                if _WFPROCESS.format == ".s" then
+                    section = ".farrodata"
+                end
+                if (obj.options.bank == 0 or obj.options.bank == 1 or obj.options.bank == "0" or obj.options.bank == "1" or obj.options.bank == "L") then
+                    section = ".rom" .. obj.options.bank
+                    if obj.options.bank_index ~= nil then
+                        local index = obj.options.bank_index
+                        if type(index) == "number" then index = string.format("%X", index) end
+                        section = section .. "_" .. index
+                        if obj.options.bank_offset ~= nil then
+                            index = obj.options.bank_offset
+                        if type(index) == "number" then index = string.format("%X", index) end
+                            section = section .. "_" .. index
+                        end
+                    end
+                    obj.bank = true
+                end
+            else
+                if _WFPROCESS.format == ".s" then
+                    section = ".rodata"
+                end
+            end
+            if section ~= "" then
+                obj.section = section .. ".a." .. key
+            end
+        end
     end
 elseif _WFPROCESS.target[1] == "psx" then
     bin2c_processor = function(obj)
         obj.align = obj.options.align or 4
+        obj.section = obj.options.section
     end
 elseif _WFPROCESS.target[1] == "gba" then
     bin2c_processor = function(obj)
         obj.align = obj.options.align or 2
+        obj.section = obj.options.section
     end
 end
 
