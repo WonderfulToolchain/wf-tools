@@ -154,7 +154,8 @@ local function emit_symbol(symbols_by_name, name, value, segment, section)
     emit_raw_symbol(symbols_by_name, name .. "&", value, section)
 end
 
-local function apply_section_name_to_entry(entry)
+local function apply_section_name_to_entry(entry, rom_banks)
+    rom_banks = rom_banks or 0
     local stype = nil
     local sempty = nil
     local iram_mode = nil
@@ -184,6 +185,15 @@ local function apply_section_name_to_entry(entry)
             if #parts >= 2 then
                 local bank = (0xFFFF << (#parts[2] * 4)) & 0xFFFF
                 bank = bank + tonumber(parts[2], 16)
+
+                -- Wrap bank index around the number of available ROM banks.
+                if rom_banks > 0 then
+                    if stype == 2 then
+                        rom_banks = (rom_banks + 15) >> 4
+                    end
+                    bank = (bank % rom_banks) + 0x10000 - rom_banks
+                end
+
                 entry.bank = bank
             end
             if #parts >= 3 then
@@ -452,7 +462,7 @@ local function run_linker(args, platform)
                 elseif #data >= 2 then
                     section_entry.align = 2
                 end
-                local is_custom_section_name, is_force_retain = apply_section_name_to_entry(section_entry)
+                local is_custom_section_name, is_force_retain = apply_section_name_to_entry(section_entry, allocator_config.rom_banks)
                 if not is_custom_section_name then
                     if stringx.startswith(section_name, ".fartext")
                     or stringx.startswith(section_name, ".farrodata")
