@@ -338,6 +338,11 @@ local function run_linker(args, platform)
     }
 
     local elf_file <close> = io.open(args.input, "rb")
+    if elf_file == nil then
+        log.error("could not open '" .. args.input .. "' for reading")
+        log.exit_if_fatal()
+    end
+
     local elf = wfelf.ELF(elf_file, wfelf.ELFCLASS32, wfelf.ELFDATA2LSB, wfelf.EM_386)
 
     local default_alloc_type = nil
@@ -855,6 +860,10 @@ local function run_linker(args, platform)
 
         -- Build ROM.
         local rom_file <close> = io.open(args.output, "wb")
+        if rom_file == nil then
+            log.error("could not open '" .. args.output .. "' for writing")
+            log.exit_if_fatal()
+        end
         local min_position = 0
         if args.trim then
             min_position = (rom_bank_count - allocated_rom_bank_count) * 0x10000 + allocated_rom_bank_offset
