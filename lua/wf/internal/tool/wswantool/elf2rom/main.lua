@@ -123,14 +123,14 @@ end
 local function relocate16le(data, offset, f)
     local spot = (data:byte(offset) & 0xFF) | ((data:byte(offset + 1) & 0xFF) << 8)
     spot = f(spot)
-    spot = string.char(spot & 0xFF) .. string.char((spot >> 8) & 0xFF)
+    spot = string.char(spot & 0xFF, (spot >> 8) & 0xFF)
     return wfnative.replace(data, spot, offset)
 end
 
 local function relocate32le(data, offset, f)
     local spot = (data:byte(offset) & 0xFF) | ((data:byte(offset + 1) & 0xFF) << 8) | ((data:byte(offset + 2) & 0xFF) << 16) | ((data:byte(offset + 3) & 0xFF) << 24)
     spot = f(spot)
-    spot = string.char(spot & 0xFF) .. string.char((spot >> 8) & 0xFF) .. string.char((spot >> 16) & 0xFF) .. string.char((spot >> 24) & 0xFF)
+    spot = string.char(spot & 0xFF, (spot >> 8) & 0xFF, (spot >> 16) & 0xFF, (spot >> 24) & 0xFF)
     return wfnative.replace(data, spot, offset)
 end
 
@@ -279,10 +279,10 @@ local function build_iram_data_push(data, joined_entry, platform)
     local flags = 0
     if joined_entry.empty > 0 then flags = flags | 0x8000 end
 
-    data = data .. string.char(length & 0xFF) .. string.char((length >> 8) & 0xFF)
-    data = data .. string.char(offset & 0xFF) .. string.char((offset >> 8) & 0xFF)
+    data = data .. string.char(length & 0xFF, (length >> 8) & 0xFF)
+    data = data .. string.char(offset & 0xFF, (offset >> 8) & 0xFF)
     if platform.mode ~= "bfb" then
-        data = data .. string.char(flags & 0xFF) .. string.char((flags >> 8) & 0xFF)
+        data = data .. string.char(flags & 0xFF, (flags >> 8) & 0xFF)
     end
     if joined_entry.empty <= 0 then data = data .. joined_entry.data end
     return data
@@ -309,7 +309,7 @@ local function build_iram_data(iram, platform)
     end
 
     data = build_iram_data_push(data, joined_entry, platform)
-    data = data .. string.char(0) .. string.char(0)
+    data = data .. string.char(0, 0)
     if #data > 0xFFF0 then
         log.error("IRAM data block too large")
     end
@@ -838,7 +838,7 @@ local function run_linker(args, platform)
 
         log.exit_if_fatal()
 
-        local linear, segment, offset = get_linear_logical_address(start_symbol)
+        local _, segment, offset = get_linear_logical_address(start_symbol)
         config.cartridge.start_segment = segment
         config.cartridge.start_offset = offset
         config.cartridge.rom_size = rom_bank_type
@@ -849,8 +849,8 @@ local function run_linker(args, platform)
         -- Calculate checksum.
         local checksum = 0
         local bytes_read = 0
-        for i, bank in pairs(allocator.banks[0]) do
-            for j, entry in pairs(bank.entries) do
+        for _, bank in pairs(allocator.banks[0]) do
+            for _, entry in pairs(bank.entries) do
                 checksum = wswan.calculate_rom_checksum(checksum, entry.data)
                 bytes_read = bytes_read + #entry.data
             end
@@ -868,9 +868,7 @@ local function run_linker(args, platform)
         if args.trim then
             min_position = (rom_bank_count - allocated_rom_bank_count) * 0x10000 + allocated_rom_bank_offset
         end
-        for i=1,(rom_size_bytes - min_position) do
-            rom_file:write(rom_pad_char)
-        end
+        rom_file:write(rom_pad_char:rep(rom_size_bytes - min_position))
         for i, bank in pairs(allocator.banks[0]) do
             for j, entry in pairs(bank.entries) do
                 local offset = ((entry.bank - rom_bank_first) * 0x10000 + entry.offset) - min_position
@@ -887,7 +885,7 @@ local function run_linker(args, platform)
             rom_file:write(entry.data)
         end
     elseif platform.mode == "bfb" then
-        local linear, segment, offset = get_linear_logical_address(start_symbol)
+        local _, segment, offset = get_linear_logical_address(start_symbol)
         if segment ~= 0x0000 then
             log.error("unsupported: non-zero .bfb start segment [%04X:%04X]", segment, offset)
         end
@@ -896,9 +894,8 @@ local function run_linker(args, platform)
 
         local rom_file <close> = io.open(args.output, "wb")
         rom_file:write("bF")
-        rom_file:write(string.char(offset & 0xFF))
-        rom_file:write(string.char(offset >> 8))
-        for i, entry in pairs(allocator.banks[wfallocator.IRAM][1].entries) do
+        rom_file:write(string.char(offset & 0xFF, offset >> 8))
+        for _, entry in pairs(allocator.banks[wfallocator.IRAM][1].entries) do
             local offset = entry.offset - offset
             local is_empty = is_string_empty(entry.data)
             if offset < 0 and not is_empty then
