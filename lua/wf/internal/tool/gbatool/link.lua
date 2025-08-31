@@ -13,15 +13,22 @@ local wswan = require('wf.internal.platform.wswan')
 
 local tool_fix = require('wf.internal.tool.gbatool.fix')
 
-local function romlink_call_linker(linkscript_filename, output_elf, output_file, linker_args)
+local function romlink_call_linker(linkscript_filename, output_elf, output_file, linker_args, subtarget)
     local success, code = execute_verbose_or_error(
         wfpath.executable('arm-none-eabi-gcc', 'toolchain/gcc-arm-none-eabi'),
         table.pack("-T", linkscript_filename, "-o", output_elf, table.unpack(linker_args))
     )
-    local success, code = execute_verbose_or_error(
-        wfpath.executable('arm-none-eabi-objcopy', 'toolchain/gcc-arm-none-eabi'),
-        table.pack("-O", "binary", output_elf, output_file)
-    )
+    if subtarget == "multiboot" then
+        local success, code = execute_verbose_or_error(
+            wfpath.executable('wf-agbpack'),
+            table.pack(output_elf, output_file)
+        )
+    else
+        local success, code = execute_verbose_or_error(
+            wfpath.executable('arm-none-eabi-objcopy', 'toolchain/gcc-arm-none-eabi'),
+            table.pack("-O", "binary", output_elf, output_file)
+        )
+    end
 end
 
 local function rom_write_linkscript_overlay(f, name, memory_name, overlays)
@@ -55,7 +62,7 @@ local function rom_write_linkscript_overlay(f, name, memory_name, overlays)
     end
 end
 
-local function rom_write_linkscript(f, parent_name, config)
+local function rom_write_linkscript(f, parent_name, config, subtarget)
     -- load information from config
     local data_region = nil
     if config.memory ~= nil then
@@ -74,6 +81,11 @@ INCLUDE ]] .. parent_name .. "\n\n")
 
     -- augment memory layout
     f:write(string.format('REGION_ALIAS("DATA", %s)\n', data_region))
+    if subtarget == "multiboot" then
+        f:write(string.format('REGION_ALIAS("DATA_LOAD", %s)\n', data_region))
+    else
+        f:write('REGION_ALIAS("DATA_LOAD", "ROM")\n')
+    end
     f:write(string.format('REGION_ALIAS("BSS", %s)\n', data_region))
     f:write(string.format('REGION_ALIAS("NOINIT", %s)\n', data_region))
 
@@ -117,12 +129,12 @@ local function romlink_run(args, linker_args)
     if linkscript_filename == nil then
         linkscript_filename = args.output_ld or temp_dir:path("link.ld")
         local linkscript_file = io.open(linkscript_filename, "w")
-        rom_write_linkscript(linkscript_file, parent_filename, config)
+        rom_write_linkscript(linkscript_file, parent_filename, config, args.subtarget)
         linkscript_file:close()
     end
 
     -- run "arm-none-eabi-ld", "arm-none-eabi-objcopy"
-    romlink_call_linker(linkscript_filename, args.output_elf or temp_dir:path("a.out.elf"), args.output, linker_args)
+    romlink_call_linker(linkscript_filename, args.output_elf or temp_dir:path("a.out.elf"), args.output, linker_args, args.subtarget)
 
     -- run "wf-gbatool fix"
     local tool_fix_args = tablex.copy(args)
