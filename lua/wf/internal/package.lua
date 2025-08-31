@@ -3,6 +3,7 @@
 
 --- Package management/querying utilities.
 
+local path = require("pl.path")
 local stringx = require("pl.stringx")
 local wfpath = require("wf.internal.path")
 local wfutil = require("wf.internal.util")
@@ -17,6 +18,19 @@ function M.installed(name)
         wfutil.OUTPUT_NONE
     )
     return success
+end
+
+function M.executable_or_error(name, binary, ...)
+    local p = wfpath.executable(binary, ...)
+    if not path.exists(p) then
+        if M.installed(name) then
+            error(string.format("package '%s' installed, but program '%s' not found", name, binary))
+        else
+            error(string.format("program '%s' not found; try 'wf-pacman -Sy %s'", binary, name))
+        end
+    else
+        return p
+    end
 end
 
 --[[

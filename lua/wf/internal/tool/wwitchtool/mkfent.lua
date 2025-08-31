@@ -6,14 +6,13 @@ local path = require('pl.path')
 local tablex = require('pl.tablex')
 local utils = require('pl.utils')
 local wfmath = require('wf.internal.math')
-local wfpath = require('wf.internal.path')
-local wfutil = require('wf.internal.util')
+local wfpackage = require('wf.internal.package')
 local wwitch = require('wf.internal.platform.wwitch')
 
 local function mkfent_elf_to_binary(in_filename)
     local tmp_filename = os.tmpname()
     local success, code = execute_verbose_or_error(
-        wfpath.executable('ia16-elf-objcopy', 'toolchain/gcc-ia16-elf'),
+        wfpackage.executable_or_error('toolchain-gcc-ia16-elf-binutils', 'ia16-elf-objcopy', 'toolchain/gcc-ia16-elf'),
         table.pack("-O", "binary", in_filename, tmp_filename)
     )
     return tmp_filename

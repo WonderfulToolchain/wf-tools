@@ -5,12 +5,12 @@
 
 local process = require("wf.api.v1.process")
 local path = require("pl.path")
-local wfpath = require("wf.internal.path")
+local wfpackage = require("wf.internal.package")
 local wfutil = require("wf.internal.util")
 
-local huffman_tool_path = wfpath.executable("wf-nnpack-huffman")
-local lzss_tool_path = wfpath.executable("wf-nnpack-lzss")
-local rle_tool_path = wfpath.executable("wf-nnpack-rle")
+local huffman_tool_path = wfpackage.executable_or_error("wf-nnpack", "wf-nnpack-huffman")
+local lzss_tool_path = wfpackage.executable_or_error("wf-nnpack", "wf-nnpack-lzss")
+local rle_tool_path = wfpackage.executable_or_error("wf-nnpack", "wf-nnpack-rle")
 if (not path.exists(huffman_tool_path)) or (not path.exists(lzss_tool_path)) or (not path.exists(rle_tool_path)) then
     error("tool not installed: wf-nnpack")
 end

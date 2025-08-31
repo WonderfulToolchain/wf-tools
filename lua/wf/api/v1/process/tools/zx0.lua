@@ -4,15 +4,11 @@
 --- <a href="https://github.com/WonderfulToolchain/salvador">wf-zx0-salvador</a> tool wrapper.
 
 local process = require("wf.api.v1.process")
-local path = require("pl.path")
 local tablex = require("pl.tablex")
-local wfpath = require("wf.internal.path")
+local wfpackage = require("wf.internal.package")
 local wfutil = require("wf.internal.util")
 
-local tool_path = wfpath.executable("wf-zx0-salvador")
-if not path.exists(tool_path) then
-    error("tool not installed: wf-zx0-salvador")
-end
+local tool_path = wfpackage.executable_or_error("wf-zx0-salvador", "wf-zx0-salvador")
 
 local function tool_run(input, args, config)
     if getmetatable(config) ~= nil and getmetatable(config).__config_data ~= nil then

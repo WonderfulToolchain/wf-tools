@@ -3,28 +3,38 @@
 
 local path = require('pl.path')
 local tablex = require('pl.tablex')
-local utils = require('pl.utils')
 local toml = require('wf.internal.toml')
-local wfmath = require('wf.internal.math')
 local wfoverlaylist = require('wf.internal.overlay_list')
+local wfpackage = require('wf.internal.package')
 local wfpath = require('wf.internal.path')
-local wfutil = require('wf.internal.util')
-local wswan = require('wf.internal.platform.wswan')
 
 local tool_fix = require('wf.internal.tool.gbatool.fix')
 
-local function romlink_call_linker(linkscript_filename, output_elf, output_file, linker_args, subtarget)
+local function romlink_call_linker(linkscript_filename, output_elf, output_file, subtarget, config, linker_args)
     local success, code = execute_verbose_or_error(
         wfpath.executable('arm-none-eabi-gcc', 'toolchain/gcc-arm-none-eabi'),
         table.pack("-T", linkscript_filename, "-o", output_elf, table.unpack(linker_args))
     )
     if subtarget == "multiboot" then
-        local success, code = execute_verbose_or_error(
-            wfpath.executable('wf-agbpack'),
-            table.pack(output_elf, output_file)
+        local options = {}
+        if config.multiboot then
+            if config.multiboot.compress == false then
+                table.insert(options, "-0")
+            else
+                if config.multiboot.vram_compression_algorithm == "lzss" then
+                    table.insert(options, "-L")
+                    table.insert(options, wfpackage.executable_or_error("wf-nnpack", "wf-nnpack-lzss"))
+                end 
+            end
+        end
+        table.insert(options, output_elf)
+        table.insert(options, output_file)
+
+        success, code = execute_verbose_or_error(
+            wfpackage.executable_or_error('wf-agbpack', 'wf-agbpack'), options
         )
     else
-        local success, code = execute_verbose_or_error(
+        success, code = execute_verbose_or_error(
             wfpath.executable('arm-none-eabi-objcopy', 'toolchain/gcc-arm-none-eabi'),
             table.pack("-O", "binary", output_elf, output_file)
         )
@@ -134,7 +144,7 @@ local function romlink_run(args, linker_args)
     end
 
     -- run "arm-none-eabi-ld", "arm-none-eabi-objcopy"
-    romlink_call_linker(linkscript_filename, args.output_elf or temp_dir:path("a.out.elf"), args.output, linker_args, args.subtarget)
+    romlink_call_linker(linkscript_filename, args.output_elf or temp_dir:path("a.out.elf"), args.output, args.subtarget, config, linker_args)
 
     -- run "wf-gbatool fix"
     local tool_fix_args = tablex.copy(args)
