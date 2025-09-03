@@ -491,6 +491,12 @@ local function run_linker(args, platform)
                                 v.segment_offset = v.segment_offset + #data
                             end
                         end
+                    elseif stringx.startswith(section_name, ".stext")
+                    or stringx.startswith(section_name, ".srodata")
+                    or stringx.startswith(section_name, ".sdata")
+                    or stringx.startswith(section_name, ".sbss")
+                    or stringx.startswith(section_name, ".snoinit") then
+                        section_entry.type = wfallocator.IRAM
                     elseif stringx.startswith(section_name, ".text")
                     or (platform.mode == "bfb" and section_entry.input_alloc and data_empty == 0) then
                         -- append at end
