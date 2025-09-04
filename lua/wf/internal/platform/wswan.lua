@@ -164,11 +164,9 @@ function M.create_rom_header(checksum, settings)
     local mapper = 0x00
     if type(settings.mapper) == "number" then
         mapper = settings.mapper
-    elseif settings.mapper == "KARNAK" then
-        mapper = 0x02
     elseif settings.rtc or (settings.mapper == "2003") then
         mapper = 0x01
-    elseif settings.mapper and (settings.mapper ~= "2001") then
+    elseif settings.mapper and (settings.mapper ~= "2001") and (settings.mapper ~= "KARNAK") then
         error("invalid mapper value")
     end
 
