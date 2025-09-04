@@ -1039,9 +1039,9 @@ local args_doc = [[
 return {
     ["bfb"] = {
         ["arguments"] = [[
-[args...] <input>: convert an ELF file to a BootFriend executable
+[args...] <input>: convert a wswan ELF file to a BootFriend executable
 ]] .. args_doc,
-        ["description"] = "convert an ELF file to a BootFriend executable",
+        ["description"] = "convert a wswan ELF file to a BootFriend executable",
         ["run"] = function(args)
             return run_linker(args, {
                 ["mode"] = "bfb"
@@ -1050,12 +1050,12 @@ return {
     },
     ["rom"] = {
         ["arguments"] = [[
-[args...] <input>: convert an ELF file to a wswan ROM
+[args...] <input>: convert a wswan ELF file to a ROM
     --ds-sram                        Place the default data segment in SRAM.
     --trim                           Trim the assembled ROM by removing unused
                                      space from the beginning of the file.
 ]] .. args_doc,
-        ["description"] = "convert an ELF file to a wswan ROM",
+        ["description"] = "convert a wswan ELF file to a ROM",
         ["run"] = function(args)
             return run_linker(args, {
                 ["mode"] = "cartridge"
@@ -1064,9 +1064,9 @@ return {
     },
     ["wgate"] = {
         ["arguments"] = [[
-[args...] <input>: convert an ELF file to a wgate executable
+[args...] <input>: convert a wswan ELF file to a WGate executable
 ]] .. args_doc,
-        ["description"] = "convert an ELF file to a wgate executable",
+        ["description"] = "convert a wswan ELF file to a WGate executable",
         ["run"] = function(args)
             return run_linker(args, {
                 ["mode"] = "wgate"
