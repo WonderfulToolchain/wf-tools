@@ -75,7 +75,7 @@ function Graph:generate_ascii_text()
         local cnt = self.counts[i]
         if cnt > 0 then
             local cnt_max = get_max_count(self, i)
-            idx = math.ceil(cnt * #ascii_shades / cnt_max)
+            idx = 1 + math.ceil(cnt * (#ascii_shades - 1) / cnt_max)
         end
         s = s .. ascii_shades[idx][1]
 
