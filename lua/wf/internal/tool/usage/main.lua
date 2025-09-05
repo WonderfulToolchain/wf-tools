@@ -123,11 +123,13 @@ local function print_text_output(banks, usage_ranges, args)
             s = s .. "+- " .. wfterm.reset()
         end
 
+        -- local has_higher_depth_below = i < #banks and (banks[i+1].depth or 0) > (bank.depth or 0)
+
         local address_width = #string.format("%X", bank.mask)
         local addr_f = "%0" .. address_width .. "X"
         local bank_mask = bank.mask or -1
 
-        output[1] = s .. bank.name
+        output[1] = s .. bank.name .. wfterm.reset()
         output[2] = string.format("0x" .. addr_f .. " -> 0x" .. addr_f, bank.range[1] & bank_mask, bank.range[2] & bank_mask)
         output[3] = string.format("%d", bank.size)
 
@@ -237,7 +239,7 @@ return function(target_name)
 
         sort_usage_ranges_for_deduplication(usage_ranges)
 
-        local banks = target.address_ranges_to_banks(ranges, config)
+        local banks = target.address_ranges_to_banks(ranges, args, config)
         print_text_output(banks, usage_ranges, args)
 
         if args.graph_detailed then
@@ -245,8 +247,8 @@ return function(target_name)
         end
     end
 
-    return {
-        ["arguments"] = [[
+    local function get_argument_string()
+        local s = [[
 <file> ...: analyze ROM memory usage
   <file>        (string)           File to analyze.
   -c,--config   (optional string)  Optional configuration file name;
@@ -255,8 +257,20 @@ return function(target_name)
   -g,--graph                       Show text graph for each section.
   --graph-detailed                 Show detailed text graph for each
                                    section.
+]]
+        if target_name == "wswan" then
+            s = s .. [[
+  --hide-linear-banks              Hide the linear ROM bank grouping.
+]]
+        end
+        s = s .. [[
   -v,--verbose                     Enable verbose logging.
-]],
+]]
+        return s
+    end
+
+    return {
+        ["arguments"] = get_argument_string(),
         ["description"] = "analyze ROM memory usage",
         ["run"] = run_usage
     }

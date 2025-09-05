@@ -41,7 +41,7 @@ target.map_address = function(address)
     return nil
 end
 
-target.address_ranges_to_banks = function(ranges, config)
+target.address_ranges_to_banks = function(ranges, args, config)
     local banks = {}
     if ranges[1] ~= nil then
         local bank_iram = {name="Internal RAM", range={0x00000000, 0x00003fff}, size=16384, mask=0xFFFF}
@@ -105,32 +105,43 @@ target.address_ranges_to_banks = function(ranges, config)
             return {name=string.format(banks_str, bank), depth=depth, range={range_from, range_to}, size=size, mask=address_mask}
         end
 
+        local hide_linear_banks = args.hide_linear_banks or (rom_size <= 768*1024)
+
         for i=0,linear_banks_count-1,1 do
             local linear_bank_idx = linear_banks_offset + i
             local bank_idx_offset = (linear_bank_idx & ((1 << (4 * (banks_width - 1))) - 1)) << 4
 
-            for i=0,3 do
-                local idx = bank_idx_offset + i
-                if idx >= banks_offset then
-                    table.insert(banks, define_rom_bank(idx, 1))
+            if hide_linear_banks then
+                for k=0,15 do
+                    local idx = bank_idx_offset + k
+                    if idx >= banks_offset then
+                        table.insert(banks, define_rom_bank(idx, 1))
+                    end
                 end
-            end
+            else
+                for k=0,3 do
+                    local idx = bank_idx_offset + k
+                    if idx >= banks_offset then
+                        table.insert(banks, define_rom_bank(idx, 1))
+                    end
+                end
 
-            local linear_bank_count = 12
-            if (bank_idx_offset + 4) < banks_offset then
-                linear_bank_count = 16 - (banks_offset - bank_idx_offset)
-            end
-            local linear_size = linear_bank_count << 16
-            local linear_range_to = ((banks_elf_offset + bank_idx_offset) << 16) + 0x200fffff
-            local linear_range_from = linear_range_to - linear_size + 1
+                local linear_bank_count = 12
+                if (bank_idx_offset + 4) < banks_offset then
+                    linear_bank_count = 16 - (banks_offset - bank_idx_offset)
+                end
+                local linear_size = linear_bank_count << 16
+                local linear_range_to = ((banks_elf_offset + bank_idx_offset) << 16) + 0x200fffff
+                local linear_range_from = linear_range_to - linear_size + 1
 
-            local linear_bank = {name=string.format(linear_banks_str, linear_bank_idx), depth=1, range={linear_range_from, linear_range_to}, size=linear_size, mask=address_mask, duplicate=true}
-            table.insert(banks, linear_bank)
+                local linear_bank = {name=string.format(linear_banks_str, linear_bank_idx), depth=1, range={linear_range_from, linear_range_to}, size=linear_size, mask=address_mask, duplicate=true}
+                table.insert(banks, linear_bank)
 
-            for i=4,15 do
-                local idx = bank_idx_offset + i
-                if idx >= banks_offset then
-                    table.insert(banks, define_rom_bank(idx, 2))
+                for k=4,15 do
+                    local idx = bank_idx_offset + k
+                    if idx >= banks_offset then
+                        table.insert(banks, define_rom_bank(idx, 2))
+                    end
                 end
             end
         end

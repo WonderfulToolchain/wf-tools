@@ -14,7 +14,7 @@ target.group_address_ranges = {
     {0x00010000, 0x0001ffff}
 }
 
-target.address_ranges_to_banks = function(ranges, config)
+target.address_ranges_to_banks = function(ranges, args, config)
     return {
         {name="Code", range={0x00000000, 0x0000ffff}, size=65536, mask=0xffff},
         {name="Data", range={0x00010000, 0x0001ffff}, size=65536, mask=0xffff}

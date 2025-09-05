@@ -29,6 +29,7 @@ end
 
 M.reset = wrap_ansi_code("0m")
 M.bold = wrap_ansi_code("1m")
+M.underline = wrap_ansi_code("4m")
 M.inverse = wrap_ansi_code("7m")
 
 M.fg = {}

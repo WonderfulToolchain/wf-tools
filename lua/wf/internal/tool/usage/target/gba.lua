@@ -16,7 +16,7 @@ target.group_address_ranges = {
     {0x08000000, 0x09ffffff}
 }
 
-target.address_ranges_to_banks = function(ranges, config)
+target.address_ranges_to_banks = function(ranges, args, config)
     local banks = {}
     table.insert(banks, {name="IWRAM", range={0x03000000, 0x03007fff}, size=32768, mask=0x7fff})
     table.insert(banks, {name="EWRAM", range={0x02000000, 0x0203ffff}, size=262144, mask=0x3ffff})
