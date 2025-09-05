@@ -49,8 +49,8 @@ target.address_ranges_to_banks = function(ranges, config)
         if ranges[1][2] >= 0x4000 then
             bank_iram.range[2] = 0x0000ffff
             bank_iram.size = 65536
-            table.insert(banks, {name="Mono area", depth=1, range={0x00000000, 0x00003fff}, size=16384, mask=0xFFFF})
-            table.insert(banks, {name="Color area", depth=1, range={0x00004000, 0x0000ffff}, size=49152, mask=0xFFFF})
+            table.insert(banks, {name="Mono area", depth=1, range={0x00000000, 0x00003fff}, size=16384, mask=0xFFFF, duplicate=true})
+            table.insert(banks, {name="Color area", depth=1, range={0x00004000, 0x0000ffff}, size=49152, mask=0xFFFF, duplicate=true})
         end
     end
 
@@ -61,13 +61,13 @@ target.address_ranges_to_banks = function(ranges, config)
     end
     if sram_size > 0 then
         local sram_last = 0x10000000 + sram_size - 1
-        table.insert(banks, {name="Cartridge SRAM", range={0x10000000, sram_last}, size=sram_size, mask=sram_last-0x10000000})
+        table.insert(banks, {name="Cartridge SRAM", range={0x10000000, sram_last}, size=sram_size, mask=sram_last-0x10000000, duplicate=true})
         for i=0,sram_size-1,65536 do
             local bank_size = sram_size - i
             if bank_size > 65536 then bank_size = 65536 end
             local sram_first = ((i & 0xFFFF0000) << 4) | 0x10000
             local sram_last = ((i & 0xFFFF0000) << 4) | 0x1ffff
-            table.insert(banks, {name=string.format("$%02X", i >> 16), depth=1, range={sram_first, sram_last}, size=65536})
+            table.insert(banks, {name=string.format("SRAM $%02X", i >> 16), depth=1, range={sram_first, sram_last}, size=65536})
         end
     end
 
@@ -93,7 +93,7 @@ target.address_ranges_to_banks = function(ranges, config)
         local linear_banks_str = "Linear $%0" .. linear_banks_width .. "X"
         local address_mask = (0x10000 << (banks_width_small * 4)) - 1
 
-        table.insert(banks, {name="Cartridge ROM", range={(ranges[3][2] | 0xFFFF) - (banks_count * 65536) + 1, ranges[3][2] | 0xFFFF}, size=rom_size, mask=address_mask})
+        table.insert(banks, {name="Cartridge ROM", range={(ranges[3][2] | 0xFFFF) - (banks_count * 65536) + 1, ranges[3][2] | 0xFFFF}, size=rom_size, mask=address_mask, duplicate=true})
 
         local define_rom_bank = function(bank, depth)
             local range_from = ((banks_elf_offset + bank) << 16) + 0x20000000
@@ -124,7 +124,7 @@ target.address_ranges_to_banks = function(ranges, config)
             local linear_range_to = ((banks_elf_offset + bank_idx_offset) << 16) + 0x200fffff
             local linear_range_from = linear_range_to - linear_size + 1
 
-            local linear_bank = {name=string.format(linear_banks_str, linear_bank_idx), depth=1, range={linear_range_from, linear_range_to}, size=linear_size, mask=address_mask}
+            local linear_bank = {name=string.format(linear_banks_str, linear_bank_idx), depth=1, range={linear_range_from, linear_range_to}, size=linear_size, mask=address_mask, duplicate=true}
             table.insert(banks, linear_bank)
 
             for i=4,15 do

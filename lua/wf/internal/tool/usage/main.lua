@@ -157,6 +157,26 @@ local function print_text_output(banks, usage_ranges, args)
     end
 end
 
+local function print_text_graph_detailed(banks, usage_ranges, args)
+    for i,bank in ipairs(banks) do
+        if not bank.duplicate then
+            local address_width = #string.format("%X", bank.mask)
+            local addr_f = "%0" .. address_width .. "X"
+            local bank_mask = bank.mask or -1
+
+            local graph = Graph(64, 16, bank.size)
+            local mark_used = function(from, size)
+                graph:mark_area_used(from - bank.range[1], size)
+            end
+            iterate_used_areas_without_duplicates(bank, usage_ranges, mark_used)
+
+            print(string.format("\n\nStart: %s  0x" .. addr_f .. " -> 0x" .. addr_f, bank.name, bank.range[1] & bank_mask, bank.range[2] & bank_mask))
+            print(graph:generate_ascii_text())
+            print(string.format("End: %s", bank.name))
+        end
+    end
+end
+
 return function(target_name)
     local target = require("wf.internal.tool.usage.target." .. target_name)
 
@@ -219,6 +239,10 @@ return function(target_name)
 
         local banks = target.address_ranges_to_banks(ranges, config)
         print_text_output(banks, usage_ranges, args)
+
+        if args.graph_detailed then
+            print_text_graph_detailed(banks, usage_ranges, args)
+        end
     end
 
     return {
@@ -229,6 +253,8 @@ return function(target_name)
                                    wfconfig.toml is used by default.
   -d,--depth    (optional number)  Maximum depth to display.
   -g,--graph                       Show text graph for each section.
+  --graph-detailed                 Show detailed text graph for each
+                                   section.
   -v,--verbose                     Enable verbose logging.
 ]],
         ["description"] = "analyze ROM memory usage",
