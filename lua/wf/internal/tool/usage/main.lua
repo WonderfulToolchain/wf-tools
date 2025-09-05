@@ -8,6 +8,7 @@ local tablex = require('pl.tablex')
 local toml = require('wf.internal.toml')
 local wfelf = require('wf.internal.elf')
 local wfterm = require('wf.internal.term')
+local Graph = require('wf.internal.tool.usage.graph')
 
 local function sort_usage_ranges_for_deduplication(usage_ranges)
     table.sort(usage_ranges, function(a, b)
@@ -101,11 +102,13 @@ local function print_text_output(banks, usage_ranges, args)
     print_section(tablex.map(function(s) return ("-"):rep(s.width) end, sections))
 
     for i,bank in ipairs(banks) do
-        local output = {"","","","","","","",""}
+        local output = {"","","","","","",""}
 
         local s = ""
         -- add tree to name
         if bank.depth ~= nil and bank.depth > 0 then
+            if args.depth ~= nil and bank.depth > args.depth then goto continue end
+
             s = s .. wfterm.fg.bright_black()
             for d=1,bank.depth-1 do
                 local has_depth_below = false
@@ -128,11 +131,13 @@ local function print_text_output(banks, usage_ranges, args)
         output[2] = string.format("0x" .. addr_f .. " -> 0x" .. addr_f, bank.range[1] & bank_mask, bank.range[2] & bank_mask)
         output[3] = string.format("%d", bank.size)
 
+        local minigraph = Graph(32, 1, bank.size)
         local used_bytes = 0
         local mark_used = function(from, size)
             if size <= 0 then return end
 
             used_bytes = used_bytes + size
+            if args.graph then minigraph:mark_area_used(from - bank.range[1], size) end
         end
         iterate_used_areas_without_duplicates(bank, usage_ranges, mark_used)
 
@@ -145,7 +150,10 @@ local function print_text_output(banks, usage_ranges, args)
         output[6] = string.format("%d", free_bytes)
         output[7] = string.format("%d%%", free_percentage)
 
+        if args.graph then table.insert(output, "|" .. minigraph:generate_ascii_text() .. "|") end
+
         print_section(output)
+        ::continue::
     end
 end
 
@@ -154,12 +162,12 @@ return function(target_name)
 
     local function run_usage(args)
         log.verbose = log.verbose or args.verbose
-    
+
         local elf_file <close> = io.open(args.file, "rb")
         if elf_file == nil then
             log.fatal("could not open '" .. args.input .. "' for reading")
         end
-        
+
         local elf = target.load_elf(elf_file)
         local config = {}
         local config_filename = args.config or "wfconfig.toml"
@@ -219,6 +227,8 @@ return function(target_name)
   <file>        (string)           File to analyze.
   -c,--config   (optional string)  Optional configuration file name;
                                    wfconfig.toml is used by default.
+  -d,--depth    (number)           Maximum depth to display.
+  -g,--graph                       Show text graph for each section.
   -v,--verbose                     Enable verbose logging.
 ]],
         ["description"] = "analyze ROM memory usage",

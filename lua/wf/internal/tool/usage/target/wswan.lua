@@ -108,8 +108,6 @@ target.address_ranges_to_banks = function(ranges, config)
         for i=0,linear_banks_count-1,1 do
             local linear_bank_idx = linear_banks_offset + i
             local bank_idx_offset = (linear_bank_idx & ((1 << (4 * (banks_width - 1))) - 1)) << 4
-            local linear_range_from = ((banks_elf_offset + bank_idx_offset + 4) << 16) + 0x20000000
-            local linear_range_to = linear_range_from + 0xbffff
 
             for i=0,3 do
                 local idx = bank_idx_offset + i
@@ -123,6 +121,8 @@ target.address_ranges_to_banks = function(ranges, config)
                 linear_bank_count = 16 - (banks_offset - bank_idx_offset)
             end
             local linear_size = linear_bank_count << 16
+            local linear_range_to = ((banks_elf_offset + bank_idx_offset) << 16) + 0x200fffff
+            local linear_range_from = linear_range_to - linear_size + 1
 
             local linear_bank = {name=string.format(linear_banks_str, linear_bank_idx), depth=1, range={linear_range_from, linear_range_to}, size=linear_size, mask=address_mask}
             table.insert(banks, linear_bank)
