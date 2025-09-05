@@ -3,6 +3,7 @@
 
 --- Lua 5.4+ temporary file library.
 
+local log = require('wf.internal.log')
 local compat = require("pl.compat")
 local dir = require('pl.dir')
 local path = require('pl.path')
@@ -43,12 +44,12 @@ M.create_directory = function(auto_remove)
         dirname = os.tmpname()
         local mkdir_success, mkdir_error = path.mkdir(dirname)
         if not mkdir_success then
-            error("could not create temporary directory: " .. mkdir_error)
+            log.fatal("could not create temporary directory: " .. mkdir_error)
         end
     else
         dirname, dirname_error = posix_stdlib.mkdtemp("/tmp/wf-XXXXXXXX")
         if not dirname then
-            error("could not create temporary directory: " .. dirname_error)
+            log.fatal("could not create temporary directory: " .. dirname_error)
         end
     end
 

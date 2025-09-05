@@ -3,6 +3,8 @@
 
 --- Math-related utilities.
 
+local log = require('wf.internal.log')
+
 local M = {}
 
 --- Align a number (by incrementing) or string (by padding with zeroes) up to a specified alignment.
@@ -17,7 +19,7 @@ function M.pad_alignment_to(value, alignment, pad_value)
         local bytes_to_append = M.pad_alignment_to(#value, alignment) - #value
         return value .. string.char(pad_value or 0):rep(bytes_to_append)
     else
-        error("invalid value type")
+        log.fatal("invalid value type")
     end  
 end
 

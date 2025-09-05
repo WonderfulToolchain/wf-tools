@@ -4,6 +4,7 @@
 --- ELF file parser.
 
 local class = require('pl.class')
+local log = require('wf.internal.log')
 
 local M = {}
 
@@ -93,7 +94,7 @@ local function get_packing(header)
         w = 8
         key = key + 2
     else
-        error("invalid elf class: " .. header.bitness)
+        log.fatal("invalid elf class: " .. header.bitness)
     end
     if header.endianness == M.ELFDATA2LSB then
         e = "<"
@@ -101,7 +102,7 @@ local function get_packing(header)
         e = ">"
         key = key + 1
     else
-        error("invalid elf endianness: " .. header.endianness)
+        log.fatal("invalid elf endianness: " .. header.endianness)
     end
     local pack = packing_cache[key]
     if pack == nil then
@@ -145,13 +146,13 @@ function ELF:_init(file, expected_bitness, expected_endianness, expected_machine
             "<c4BBBBBxxxxxxx", file:read(16)
         )
         if magic ~= M.ELF_MAGIC then
-            error("invalid elf magic")
+            log.fatal("invalid elf magic")
         end
         if expected_bitness ~= nil and expected_bitness ~= bitness then
-            error("invalid elf class: " .. bitness .. ", expected " .. expected_bitness)
+            log.fatal("invalid elf class: " .. bitness .. ", expected " .. expected_bitness)
         end
         if expected_endianness ~= nil and expected_endianness ~= endianness then
-            error("invalid elf endianness: " .. endianness .. ", expected " .. expected_endianness)
+            log.fatal("invalid elf endianness: " .. endianness .. ", expected " .. expected_endianness)
         end
         self.bitness = bitness
         self.endianness = endianness
@@ -165,13 +166,13 @@ function ELF:_init(file, expected_bitness, expected_endianness, expected_machine
             pack.ehdr, file:read(string.packsize(pack.ehdr))
         )
         if expected_machine ~= nil and expected_machine ~= self.machine then
-            error("invalid elf machine: " .. self.machine .. ", expected " .. expected_machine)
+            log.fatal("invalid elf machine: " .. self.machine .. ", expected " .. expected_machine)
         end
         -- phdr
         self.phdr = {}
         if self.phnum > 0 then
             if self.phentsize ~= string.packsize(pack.phent) then
-                error("invalid phdr size: " .. self.phentsize .. ", expected " .. string.packsize(pack.phent))
+                log.fatal("invalid phdr size: " .. self.phentsize .. ", expected " .. string.packsize(pack.phent))
             end
             file:seek("set", self.phoff)
             for i=1,self.phnum do
@@ -194,7 +195,7 @@ function ELF:_init(file, expected_bitness, expected_endianness, expected_machine
         self.shdr = {}
         if self.shnum > 0 then
             if self.shentsize ~= string.packsize(pack.shent) then
-                error("invalid shdr size: " .. self.shentsize .. ", expected " .. string.packsize(pack.shent))
+                log.fatal("invalid shdr size: " .. self.shentsize .. ", expected " .. string.packsize(pack.shent))
             end
             file:seek("set", self.shoff)
             for i=1,self.shnum do

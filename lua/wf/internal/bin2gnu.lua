@@ -5,6 +5,8 @@
 
 local M = {}
 
+local log = require('wf.internal.log')
+
 local c_values_per_line <const> = 12
 local asm_values_per_line <const> = 12
 
@@ -37,10 +39,10 @@ local function bin2cs(c_file, h_file, program_name, entries, write_asm)
         elseif dtype == "uint32_t" or dtype == "int32_t" then
             width = 4
         else
-            error("unsupported datatype: " .. dtype)
+            log.fatal("unsupported datatype: " .. dtype)
         end
         if endian ~= "little" and endian ~= "big" then
-            error("unsupported endianness: " .. endian)
+            log.fatal("unsupported endianness: " .. endian)
         end
 
         local attributes = entry.attributes or {}

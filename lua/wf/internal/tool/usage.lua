@@ -81,8 +81,8 @@ targets.wswan.address_ranges_to_banks = function(ranges, config)
         if ranges[1][2] >= 0x4000 then
             bank_iram.range[2] = 0x0000ffff
             bank_iram.size = 65536
-            table.insert(banks, {name="Mono", depth=1, range={0x00000000, 0x00003fff}, size=16384, mask=0xFFFF})
-            table.insert(banks, {name="Color", depth=1, range={0x00004000, 0x0000ffff}, size=49152, mask=0xFFFF})
+            table.insert(banks, {name="Mono area", depth=1, range={0x00000000, 0x00003fff}, size=16384, mask=0xFFFF})
+            table.insert(banks, {name="Color area", depth=1, range={0x00004000, 0x0000ffff}, size=49152, mask=0xFFFF})
         end
     end
 
@@ -104,7 +104,7 @@ targets.wswan.address_ranges_to_banks = function(ranges, config)
     end
 
     if ranges[3] ~= nil then
-        local rom_size = 0
+        local rom_size = 131072
         if config.cartridge.rom_banks then
             rom_size = config.cartridge.rom_banks * 65536
         end
@@ -179,8 +179,7 @@ return function(target_name)
     
         local elf_file <close> = io.open(args.file, "rb")
         if elf_file == nil then
-            log.error("could not open '" .. args.input .. "' for reading")
-            log.exit_if_fatal()
+            log.fatal("could not open '" .. args.input .. "' for reading")
         end
         
         local elf = target.load_elf(elf_file)

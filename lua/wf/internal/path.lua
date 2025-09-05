@@ -3,6 +3,7 @@
 
 --- Path querying.
 
+local log = require('wf.internal.log')
 local compat = require("pl.compat")
 local dir = require("pl.dir")
 local path = require("pl.path")
@@ -25,7 +26,7 @@ if compat.is_windows then
         wfutil.OUTPUT_CAPTURE
     )
     if not bd_success then
-        error("could not retrieve toolchain directory")
+        log.fatal("could not retrieve toolchain directory")
     end
     base_path = stringx.strip(base_path)
 else
@@ -62,7 +63,7 @@ function M.copypath(src, dest, filter)
         if #source_dir <= 0 or filter == nil or filter(source_dir) then
             if not path.isdir(destination_dir) then
                 if not dir.makepath(destination_dir) then
-                    error("could not create directory: " .. source_dir)
+                    log.fatal("could not create directory: " .. source_dir)
                 end
             end
             for i, file in ipairs(files) do
@@ -71,7 +72,7 @@ function M.copypath(src, dest, filter)
                 if filter == nil or filter(source_file) then
                     local destination_file_path = path.join(dest, source_file)
                     if not dir.copyfile(source_file_path, destination_file_path) then
-                        error("could not create file: " .. source_file)
+                        log.fatal("could not create file: " .. source_file)
                     end
                 end
             end

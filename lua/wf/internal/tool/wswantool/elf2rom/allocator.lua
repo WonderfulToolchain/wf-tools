@@ -3,6 +3,7 @@
 
 local class = require("pl.class")
 local tablex = require("pl.tablex")
+local log = require("wf.internal.log")
 
 local M = {}
 
@@ -368,7 +369,7 @@ local function try_place_entry_inner(banks, entry)
             sentry.parent_offset = pos - 1
             sentry.data = entry.data:sub(pos, pos + bank.size - 1 - sentry.offset)
             if not banks[sentry.bank]:try_place(sentry, false) then
-                error("unexpected disagreement between simulation and real bank placement attempt")
+                log.fatal("unexpected disagreement between simulation and real bank placement attempt")
             end
             if i ~= bank_count then
                 pos = pos + bank.size - sentry.offset
@@ -523,7 +524,7 @@ function Allocator:allocate(config, is_final)
     -- Add fixed entries, as we know exactly where they need to go.
     for i, entry in pairs(self.fixed_entries) do
         if not try_place_entry(config, banks, entry) then
-            error("could not allocate: " .. get_entry_name(entry))
+            log.fatal("could not allocate: " .. get_entry_name(entry))
         end
     end
     
@@ -554,7 +555,7 @@ function Allocator:allocate(config, is_final)
 
     for i, entry in pairs(self.entries) do
         if not try_place_entry(config, banks, entry) then
-            error("could not allocate: " .. get_entry_name(entry))
+            log.fatal("could not allocate: " .. get_entry_name(entry))
         end
     end
 

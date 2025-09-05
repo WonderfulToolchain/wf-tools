@@ -3,6 +3,7 @@ local path = require('pl.path')
 local stringx = require('pl.stringx')
 local utils = require('pl.utils')
 local wfpath = require('wf.internal.path')
+local log = require('wf.internal.log')
 
 local ide_update_paths = {
     ".clangd",
@@ -17,7 +18,7 @@ return function(target)
         end
         local template_path = path.join(wfpath.base, "templates", template_name)
         if not path.exists(template_path) then
-            error("template " .. template_name .. " does not exist")
+            log.fatal("template " .. template_name .. " does not exist")
         end
         return template_path
     end

@@ -1,6 +1,8 @@
 -- SPDX-License-Identifier: MIT
 -- SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
+local log = require('wf.internal.log')
+
 local M = {}
 
 M.create = function(combinations)
@@ -101,7 +103,7 @@ M.create = function(combinations)
 
         -- advance layer
         if #curr_list == 0 then
-            error("infinite loop detected?")
+            log.fatal("infinite loop detected?")
         end
         table.insert(all_lists, curr_list)
         curr_list = {}

@@ -3,6 +3,7 @@
 
 --- Helpers for the "wswan" target.
 
+local log = require("wf.internal.log")
 local wfmath = require("wf.internal.math")
 local M = {}
 
@@ -67,7 +68,7 @@ M.EEPROM_SIZE_BY_TYPE = {
 --- @return number checksum The calculated checksum.
 function M.calculate_rom_padding_checksum(pad, count)
     if count < 0 then
-        error("invalid pad count: " .. count)
+        log.fatal("invalid pad count: " .. count)
     end
     return ((pad & 0xFF) * (count & 0xFFFF)) & 0xFFFF
 end
@@ -92,7 +93,7 @@ function M.calculate_rom_checksum(...)
             checksum = (checksum + v_checksum) & 0xFFFF
             bytes_read = bytes_read + v_bytes_read
         else
-            error("unsupported value type")
+            log.fatal("unsupported value type")
         end
     end
     return checksum, bytes_read
@@ -137,7 +138,7 @@ function M.create_rom_header(checksum, settings)
         elseif settings.rom_speed == 1 then
             flags = flags & 0xF7
         else
-            error("invalid rom_speed value")
+            log.fatal("invalid rom_speed value")
         end
     end
     if settings.rom_bus_width then
@@ -146,7 +147,7 @@ function M.create_rom_header(checksum, settings)
         elseif settings.rom_bus_width == 8 then
             flags = flags & 0xFB
         else
-            error("invalid rom_bus_width value")
+            log.fatal("invalid rom_bus_width value")
         end
     end
     if settings.orientation then
@@ -155,7 +156,7 @@ function M.create_rom_header(checksum, settings)
         elseif settings.orientation == "horizontal" then
             flags = flags & 0xFE
         else
-            error("invalid orientation value")
+            log.fatal("invalid orientation value")
         end
     elseif settings.vertical then
         flags = flags | 0x01
@@ -167,12 +168,12 @@ function M.create_rom_header(checksum, settings)
     elseif settings.rtc or (settings.mapper == "2003") then
         mapper = 0x01
     elseif settings.mapper and (settings.mapper ~= "2001") and (settings.mapper ~= "KARNAK") then
-        error("invalid mapper value")
+        log.fatal("invalid mapper value")
     end
 
     local save_type = M.get_save_type(settings)
     if save_type == nil then
-        error("invalid save type value")
+        log.fatal("invalid save type value")
     end
 
     local header = string.char(

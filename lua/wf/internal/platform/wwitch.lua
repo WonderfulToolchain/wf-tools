@@ -3,6 +3,7 @@
 
 --- Helpers for the "wwitch" target.
 
+local log = require("wf.internal.log")
 local wfmath = require("wf.internal.math")
 local wfstring = require("wf.internal.string")
 local M = {}
@@ -40,7 +41,7 @@ function M.file_attributes_to_integer(mode)
         end
         return result
     else
-        error("invalid mode type")
+        log.fatal("invalid mode type")
     end
 end
 

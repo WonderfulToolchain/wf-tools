@@ -52,7 +52,7 @@ local function entry_plus_offset(entry, offset)
         -- SRAM
         return 0x10000 + offset
     else
-        error("unsupported allocator type: " .. entry.type)
+        log.fatal("unsupported allocator type: " .. entry.type)
     end
 end
 

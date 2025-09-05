@@ -9,6 +9,7 @@ local toml = require('wf.internal.toml')
 local wfpath = require('wf.internal.path')
 local wfstring = require('wf.internal.string')
 local wfutil = require('wf.internal.util')
+local log = require('wf.internal.log')
 
 local function gbafix_strfield(rom, name, loc, value, vlen, pad)
     if value ~= nil then
@@ -20,6 +21,8 @@ local function gbafix_strfield(rom, name, loc, value, vlen, pad)
 end
 
 local function gbafix_run(args)
+    log.verbose = log.verbose or args.verbose
+
     local config = args
     local config_filename = args.config or "wfconfig.toml"
     if (args.config ~= nil) or path.exists(config_filename) then
@@ -32,13 +35,13 @@ local function gbafix_run(args)
     local rom_filename = args.input_file
     if args.output and path.normpath(args.output) ~= path.normpath(args.input_file) then
         if not dir.copyfile(args.input_file, args.output) then
-            error("could not create file: " .. args.output)
+            log.fatal("could not create file: " .. args.output)
         end
         rom_filename = args.output
     end
     local rom <close> = io.open(rom_filename, "r+b")
     if rom == nil then
-        error("could not open file: " .. rom_filename)
+        log.fatal("could not open file: " .. rom_filename)
     end
 
     -- adjust config-requested fields
@@ -60,9 +63,9 @@ local function gbafix_run(args)
         end
         logo_data = utils.readfile(logo_path, true)
         if logo_data == nil then
-            error("could not load logo data: " .. config.logo)
+            log.fatal("could not load logo data: " .. config.logo)
         elseif #logo_data ~= 156 then
-            error("could not load logo data: " .. config.logo .. " (invalid size " .. #logo_data .. ")")
+            log.fatal("could not load logo data: " .. config.logo .. " (invalid size " .. #logo_data .. ")")
         end
         print_verbose("adjusting logo to " .. config.logo)
         rom:seek("set", 0x04)

@@ -7,8 +7,11 @@ local toml = require('wf.internal.toml')
 local wfelf = require('wf.internal.elf')
 local wfmath = require('wf.internal.math')
 local wfpsx = require('wf.internal.platform.psx')
+local log = require('wf.internal.log')
 
 local function mkpsexe_run(args, linker_args)
+    log.verbose = log.verbose or args.verbose
+
     local config = toml.decodeFromFile(args.config or "wfconfig.toml")
     local elf_file <close> = io.open(args.input, "rb")
     local elf_file_root, elf_file_ext = path.splitext(args.input)
@@ -38,16 +41,16 @@ local function mkpsexe_run(args, linker_args)
     end
 
     if target_text_start > target_text_end then
-        error("could not find code/data in ELF")
+        log.fatal("could not find code/data in ELF")
     end
     if target_text_start < 0x80010000 then
-        error("code/data starts too early")
+        log.fatal("code/data starts too early")
     end
     if target_text_end >= 0x80200000 then
-        error("code/data ends too late")
+        log.fatal("code/data ends too late")
     end
     if (target_text_start & 0x7FF) ~= 0 then
-        error("code/data not aligned to 2 KB")
+        log.fatal("code/data not aligned to 2 KB")
     end
 
     local target_text_length = wfmath.pad_alignment_to(target_text_end - target_text_start + 1, 2048)
@@ -67,7 +70,7 @@ local function mkpsexe_run(args, linker_args)
         if phdr.type == wfelf.PT_LOAD and phdr.filesz > 0 then
             local exe_addr = phdr.vaddr - target_text_start
             if exe_addr < 0 or (exe_addr + phdr.filesz) > target_text_length then
-                error("exe phdr section out of range: " .. i)
+                log.fatal("exe phdr section out of range: " .. i)
             end
             elf_file:seek("set", phdr.offset)
             exe_file:seek("set", 2048 + exe_addr)

@@ -3,6 +3,7 @@
 
 --- String-related utilities.
 
+local log = require("wf.internal.log")
 local iconv = require("iconv")
 local M = {}
 
@@ -42,7 +43,7 @@ function M.convert(s, to, from, length)
         local cvt = iconv.new(to, from or M.encoding.utf8)
         result, err = cvt:iconv(s)
         if err ~= nil then
-            error("could not convert string from " .. from .. " to " .. to)
+            log.fatal("could not convert string from " .. from .. " to " .. to)
         end
     end
     if length then

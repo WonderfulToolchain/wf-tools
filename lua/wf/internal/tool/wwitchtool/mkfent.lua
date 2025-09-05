@@ -8,6 +8,7 @@ local utils = require('pl.utils')
 local wfmath = require('wf.internal.math')
 local wfpackage = require('wf.internal.package')
 local wwitch = require('wf.internal.platform.wwitch')
+local log = require('wf.itnernal.log')
 
 local function mkfent_elf_to_binary(in_filename)
     local tmp_filename = os.tmpname()
@@ -19,6 +20,8 @@ local function mkfent_elf_to_binary(in_filename)
 end
 
 local function mkfent_run(args)
+    log.verbose = log.verbose or args.verbose
+
     local config = args
     if args.input_file then
         config = tablex.union(plconfig.read(args.input_file, {
@@ -26,16 +29,16 @@ local function mkfent_run(args)
         }), config)
     end
     if not config then
-        error("error reading config file")
+        log.fatal("error reading config file")
     end
     if not config.source then
-        error("missing mandatory field: source")
+        log.fatal("missing mandatory field: source")
     end
     local source_base, source_ext = path.splitext(config.source)
 
     if args.input_file then
         if not config.name then
-            error("missing mandatory field: name")
+            log.fatal("missing mandatory field: name")
         end
         config.info = config.info or ""
     else
