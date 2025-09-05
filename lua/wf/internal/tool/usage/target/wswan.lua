@@ -44,7 +44,7 @@ end
 target.address_ranges_to_banks = function(ranges, config)
     local banks = {}
     if ranges[1] ~= nil then
-        local bank_iram = {name="IRAM", range={0x00000000, 0x00003fff}, size=16384, mask=0xFFFF}
+        local bank_iram = {name="Internal RAM", range={0x00000000, 0x00003fff}, size=16384, mask=0xFFFF}
         table.insert(banks, bank_iram)
         if ranges[1][2] >= 0x4000 then
             bank_iram.range[2] = 0x0000ffff
@@ -61,7 +61,7 @@ target.address_ranges_to_banks = function(ranges, config)
     end
     if sram_size > 0 then
         local sram_last = 0x10000000 + sram_size - 1
-        table.insert(banks, {name="SRAM", range={0x10000000, sram_last}, size=sram_size, mask=sram_last-0x10000000})
+        table.insert(banks, {name="Cartridge SRAM", range={0x10000000, sram_last}, size=sram_size, mask=sram_last-0x10000000})
         for i=0,sram_size-1,65536 do
             local bank_size = sram_size - i
             if bank_size > 65536 then bank_size = 65536 end

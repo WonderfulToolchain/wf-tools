@@ -227,7 +227,7 @@ return function(target_name)
   <file>        (string)           File to analyze.
   -c,--config   (optional string)  Optional configuration file name;
                                    wfconfig.toml is used by default.
-  -d,--depth    (number)           Maximum depth to display.
+  -d,--depth    (optional number)  Maximum depth to display.
   -g,--graph                       Show text graph for each section.
   -v,--verbose                     Enable verbose logging.
 ]],
