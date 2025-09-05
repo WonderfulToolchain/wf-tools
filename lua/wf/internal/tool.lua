@@ -5,6 +5,7 @@ local lapp = require('pl.lapp')
 local pretty = require('pl.pretty')
 local tablex = require('pl.tablex')
 local wftempfile = require('wf.internal.tempfile')
+local wfterm = require('wf.internal.term')
 local wfutil = require('wf.internal.util')
 
 local args

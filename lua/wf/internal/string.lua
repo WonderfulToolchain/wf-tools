@@ -16,7 +16,7 @@ M.encoding.shiftjis = "sjis"
 --- @param value string The string to pad.
 --- @param vlen number The expected length.
 --- @param pad_char? number The padding character, \0 by default.
---- @return result string The aligned value.
+--- @return string result The aligned value.
 function M.pad_to_length(value, vlen, pad_char)
     if #value == vlen then
         return value

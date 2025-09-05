@@ -20,6 +20,7 @@ M.ET_CORE = 4
 M.EM_NONE = 0
 M.EM_386 = 3
 M.EM_MIPS = 8
+M.EM_ARM = 40
 M.SHN_UNDEF = 0
 M.SHN_ABS = 0xFFF1
 M.SHN_COMMON = 0xFFF2
@@ -178,12 +179,12 @@ function ELF:_init(file, expected_bitness, expected_endianness, expected_machine
                 if w == 8 then
                     phdr.type, phdr.flags, phdr.offset, phdr.vaddr, phdr.paddr,
                     phdr.filesz, phdr.memsz, phdr.align = string.unpack(
-                        pack.phent, file:read(header.phentsize)
+                        pack.phent, file:read(self.phentsize)
                     )
                 else
                     phdr.type, phdr.offset, phdr.vaddr, phdr.paddr, phdr.filesz,
                     phdr.memsz, phdr.flags, phdr.align = string.unpack(
-                        pack.phent, file:read(header.phentsize)
+                        pack.phent, file:read(self.phentsize)
                     )
                 end
                 self.phdr[i] = phdr

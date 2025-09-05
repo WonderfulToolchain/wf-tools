@@ -3,11 +3,13 @@
 
 --- Logging library.
 
+local wfterm = require("wf.internal.term")
+
 local M = {}
 
-local function print_error(level, message)
+local function print_error(prefix, level, message)
     local info = debug.getinfo(3, "Sl")
-    io.stderr:write(level .. ": " .. info.short_src .. ":" .. info.currentline .. ": " .. message .. "\n")
+    io.stderr:write(prefix .. level .. ": " .. info.short_src .. ":" .. info.currentline .. ": " .. message .. wfterm.reset() .. "\n")
     io.stderr:flush()
 end
 
@@ -17,18 +19,18 @@ M.fatal_raised = false
 M.info = function(...)
     local args = {...}
     if M.verbose then
-        print_error("info", string.format(table.unpack(args)))
+        print_error("", "info", string.format(table.unpack(args)))
     end
 end
 
 M.warn = function(...)
     local args = {...}
-    print_error("warning", string.format(table.unpack(args)))
+    print_error(wfterm.bright_yellow(), "warning", string.format(table.unpack(args)))
 end
 
 M.error = function(...)
     local args = {...}
-    print_error("error", string.format(table.unpack(args)))
+    print_error(wfterm.bright_red(), "error", string.format(table.unpack(args)))
     M.fatal_raised = true
 end
 
