@@ -15,6 +15,7 @@ local wfutil = require('wf.internal.util')
 local wswan = require('wf.internal.platform.wswan')
 
 local wfallocator = require('wf.internal.tool.wswantool.elf2rom.allocator')
+local wfsymbol = require('wf.internal.tool.wswantool.elf2rom.symbol')
 
 local EMPTY_YES = 1
 local EMPTY_DONTCARE = 2
@@ -68,38 +69,43 @@ local function vma_entry_plus_offset(entry, offset)
 end
 
 local function get_linear_address(symbol)
-    if symbol[2] == nil then
-        return entry_plus_offset(symbol[1], 0)
-    elseif type(symbol[2]) == "number" then
-        return symbol[2]
-    elseif symbol[2].shndx >= wfelf.SHN_ABS then
-        if symbol[2].shndx == wfelf.SHN_ABS then
-            return symbol[2].value
+    if symbol.value ~= nil then
+        -- symbol is hardcoded address
+        return symbol.value
+    elseif symbol.elf == nil then
+        -- symbol points to section
+        return entry_plus_offset(symbol.section, 0)
+    elseif symbol.elf.shndx >= wfelf.SHN_ABS then
+        -- handle special sections
+        if symbol.elf.shndx == wfelf.SHN_ABS then
+            return symbol.elf.value
         else
-            log.error("unsupported ELF section index: 0x%04X", symbol[2].shndx)
+            log.error("unsupported ELF section index: 0x%04X", symbol.elf.shndx)
         end
-    elseif symbol[1] == nil then
-        return symbol[2].value
+    elseif symbol.section == nil then
+        -- symbol has no section, value only
+        return symbol.elf.value
     else
-        return entry_plus_offset(symbol[1], symbol[2].value)
+        -- symbol has section + value
+        return entry_plus_offset(symbol.section, symbol.elf.value)
     end
 end
 
 local function get_vma_address(symbol)
-    if symbol[2] == nil then
-        return vma_entry_plus_offset(symbol[1], 0)
-    elseif type(symbol[2]) == "number" then
-        return symbol[2]
-    elseif symbol[2].shndx >= wfelf.SHN_ABS then
-        if symbol[2].shndx == wfelf.SHN_ABS then
-            return symbol[2].value
+    if symbol.value ~= nil then
+        return symbol.value
+    elseif symbol.elf == nil then
+        return vma_entry_plus_offset(symbol.section, 0)
+    elseif symbol.elf.shndx >= wfelf.SHN_ABS then
+        if symbol.elf.shndx == wfelf.SHN_ABS then
+            return symbol.elf.value
         else
-            log.error("unsupported ELF section index: 0x%04X", symbol[2].shndx)
+            log.error("unsupported ELF section index: 0x%04X", symbol.elf.shndx)
         end
-    elseif symbol[1] == nil then
-        return symbol[2].value
+    elseif symbol.section == nil then
+        return symbol.elf.value
     else
-        return vma_entry_plus_offset(symbol[1], symbol[2].value)
+        return vma_entry_plus_offset(symbol.section, symbol.elf.value)
     end
 end
 
@@ -107,9 +113,9 @@ local function get_linear_logical_address(symbol, offset)
     offset = offset or 0
     local linear = get_linear_address(symbol)
     local segment
-    if symbol[1] ~= nil and symbol[1].segment ~= nil and symbol[1].segment.type ~= wfallocator.IRAM then
-        segment = entry_plus_offset(symbol[1].segment, 0)
-    elseif symbol[1] ~= nil and (symbol[1].type == 2 or symbol[1].type == -1) then
+    if symbol.section ~= nil and symbol.section.segment ~= nil and symbol.section.segment.type ~= wfallocator.IRAM then
+        segment = entry_plus_offset(symbol.section.segment, 0)
+    elseif symbol.section ~= nil and (symbol.section.type == 2 or symbol.section.type == -1) then
         segment = (linear & 0xFFFF0)
     else
         linear = linear + offset
@@ -134,24 +140,18 @@ local function relocate32le(data, offset, f)
     return wfnative.replace(data, spot, offset)
 end
 
-local function emit_raw_symbol(symbols_by_name, name, value, section)
-    symbols_by_name[name] = {
-        section,
-        {
-            ["value"] = value,
-            ["size"] = 0,
-            ["info"] = wfelf.STT_NOTYPE,
-            ["other"] = 0,
-            ["shndx"] = wfelf.SHN_ABS
-        },
-        name
-    }
+local function emit_raw_symbol(symbols, name, value, section)
+    symbols[name] = wfsymbol.Symbol({
+        section=section,
+        value=value,
+        name=name
+    })
 end
 
-local function emit_symbol(symbols_by_name, name, value, segment, section)
-    emit_raw_symbol(symbols_by_name, name, value, section)
-    emit_raw_symbol(symbols_by_name, name .. "!", segment or 0, section)
-    emit_raw_symbol(symbols_by_name, name .. "&", value, section)
+local function emit_symbol(symbols, name, value, segment, section)
+    emit_raw_symbol(symbols, name, value, section)
+    emit_raw_symbol(symbols, name .. "!", segment or 0, section)
+    emit_raw_symbol(symbols, name .. "&", value, section)
 end
 
 local function apply_section_name_to_entry(entry, rom_banks)
@@ -538,8 +538,8 @@ local function run_linker(args, platform)
     log.exit_if_fatal()
 
     -- Parse symbol table.
-    local symbols = {}
-    local symbols_by_name = {} 
+    local symbols_elf_idx = {}
+    local symbols = {} 
     local symtab_count = symtab.size / symtab.entsize
     for i=1,symtab_count do
         local sym = {}
@@ -559,9 +559,9 @@ local function run_linker(args, platform)
         end
         if #symbol_name > 0 then
             local section = sections[sym.shndx + 1]
-            local symbol_entry = {section, sym, symbol_name}
-            symbols[i] = symbol_entry
-            symbols_by_name[symbol_name] = symbol_entry
+            local symbol = wfsymbol.Symbol({section=section, elf=sym, name=symbol_name})
+            symbols_elf_idx[i] = symbol
+            symbols[symbol_name] = symbol
         end
     end
 
@@ -584,7 +584,7 @@ local function run_linker(args, platform)
                 local r_offset, r_type, r_sym = string.unpack(
                     "<I4BI3", elf_file:read(shdr.entsize)
                 )
-                local symbol = symbols[r_sym + 1]
+                local symbol = symbols_elf_idx[r_sym + 1]
                 table.insert(relocations, {
                     ["offset"] = r_offset,
                     ["type"] = r_type,
@@ -599,11 +599,11 @@ local function run_linker(args, platform)
 
     log.exit_if_fatal()
 
-    local start_symbol = symbols_by_name["_start"]
+    local start_symbol = symbols["_start"]
     if start_symbol == nil then
         log.error("could not find symbol: _start")
     else
-        retained_sections[start_symbol[1].input_index] = true
+        retained_sections[start_symbol.section.input_index] = true
     end
  
     log.exit_if_fatal()
@@ -616,9 +616,9 @@ local function run_linker(args, platform)
             local target_section = relocation.section
             local symbol = relocation.symbol
             
-            if symbol[1] ~= nil then
+            if symbol.section ~= nil then
                 -- the symbol in this section...
-                local child_id = symbol[1].input_index
+                local child_id = symbol.section.input_index
                 -- ... is relocated in this section.
                 local parent_id = target_section.input_index
                 if parent_id ~= nil and child_id ~= nil then
@@ -710,11 +710,11 @@ local function run_linker(args, platform)
     else
         heap_start, heap_length = iram:find_gap(0, 0x4000, true)
     end
-    emit_symbol(symbols_by_name, "__wf_heap_start", heap_start)
-    emit_symbol(symbols_by_name, "__wf_heap_top", heap_start + heap_length)
-    emit_symbol(symbols_by_name, "__wf_data_block", entry_plus_offset(iram_entry, 0), entry_plus_offset(iram_entry, 0) & 0xFFFF0, iram_entry)
+    emit_symbol(symbols, "__wf_heap_start", heap_start)
+    emit_symbol(symbols, "__wf_heap_top", heap_start + heap_length)
+    emit_symbol(symbols, "__wf_data_block", entry_plus_offset(iram_entry, 0), entry_plus_offset(iram_entry, 0) & 0xFFFF0, iram_entry)
 
-    emit_raw_symbol(symbols_by_name, ".debug_frame!", 0)
+    emit_raw_symbol(symbols, ".debug_frame!", 0)
 
     -- Apply relocations.
     local symbols_not_found = {}
@@ -724,22 +724,22 @@ local function run_linker(args, platform)
         local target_section = relocation.section
         local symbol = relocation.symbol
 
-        local symbol_found = symbol[2].shndx ~= wfelf.SHN_UNDEF
+        local symbol_found = symbol:is_defined()
         if not symbol_found then
-            -- We may have added the symbol to symbols_by_name manually.
-            if symbols_by_name[symbol[3]] ~= nil then
-                symbol = symbols_by_name[symbol[3]]
-                local symbol_key = symbol[3]
-                symbol_found = symbol ~= nil and symbol[2].shndx ~= wfelf.SHN_UNDEF
+            -- We may have added the symbol to symbols manually.
+            if symbols[symbol.name] ~= nil then
+                symbol = symbols[symbol.name]
+                local symbol_key = symbol.name
+                symbol_found = symbol ~= nil and symbol:is_defined()
                 if not symbol_found then
-                    if stringx.startswith(symbol[3], "__bank_") then
+                    if stringx.startswith(symbol.name, "__bank_") then
                         -- __bank handling: Dynamically create a faux-symbol.
-                        symbol_key = symbol[3]:sub(8)
-                        if symbols_by_name[symbol_key] ~= nil then
-                            symbol = symbols_by_name[symbol_key]
-                            if symbol ~= nil and symbol[1] ~= nil then
-                                symbol = {nil, symbol[1].bank or 0, symbol_key}
-                                symbols_by_name[symbol_key] = symbol
+                        symbol_key = symbol.name:sub(8)
+                        if symbols[symbol_key] ~= nil then
+                            symbol = symbols[symbol_key]
+                            if symbol ~= nil and symbol.section ~= nil then
+                                symbol = wfsymbol.Symbol({value=symbol.section.bank or 0, name=symbol_key})
+                                symbols[symbol_key] = symbol
                                 symbol_found = true
                             end
                         end
@@ -748,9 +748,9 @@ local function run_linker(args, platform)
             end
 
             if not symbol_found then
-                if symbols_not_found[symbol[3]] == nil then
-                    symbols_not_found[symbol[3]] = true
-                    log.error("could not locate symbol: " .. symbol[3])
+                if symbols_not_found[symbol.name] == nil then
+                    symbols_not_found[symbol.name] = true
+                    log.error("could not locate symbol: " .. symbol.name)
                 end
             end
         end
@@ -761,7 +761,7 @@ local function run_linker(args, platform)
                 target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v + segment end)
             else
                 local value = linear
-                if stringx.endswith(symbol[3], "!") then
+                if stringx.endswith(symbol.name, "!") then
                     value = segment << 4
                 end
                 if r_type == wfelf.R_386_32 then
@@ -941,7 +941,7 @@ local function run_linker(args, platform)
                 local section = sections[i]
                 if section ~= nil and section.input_alloc then
                     local section_name = wfelf.read_string(elf_file, shstrtab, shdr.name)
-                    local section_symbol = {section, nil, ""}
+                    local section_symbol = wfsymbol.Symbol({section=section, name=""})
 
                     local address = get_vma_address(section_symbol)
                     if stringx.endswith(section_name, "!") then
@@ -979,11 +979,11 @@ local function run_linker(args, platform)
                 symtab.offset = offset
                 out_file:seek("set", offset)
 
-                for _, sym in pairs(symbols) do
+                for _, symbol in pairs(symbols_elf_idx) do
                     local shndx = wfelf.SHN_ABS
-                    if sym[2] ~= nil then
-                        if sym[2].shndx ~= nil then
-                            shndx = sym[2].shndx
+                    if symbol.elf ~= nil then
+                        if symbol.elf.shndx ~= nil then
+                            shndx = symbol.elf.shndx
                             if shndx < 0xFFF0 then
                                 local map = shdr_mapping[shndx + 1]
                                 if map ~= nil then
@@ -993,7 +993,7 @@ local function run_linker(args, platform)
                         end
 
                         out_file:write(string.pack(symtab_pack,
-                            sym[2].name, sym[2].value, sym[2].size, sym[2].info, sym[2].other,
+                            symbol.elf.name, symbol.elf.value, symbol.elf.size, symbol.elf.info, symbol.elf.other,
                             shndx
                         ))
                         symtab.size = symtab.size + symtab.entsize
