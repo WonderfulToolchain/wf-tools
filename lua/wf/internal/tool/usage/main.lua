@@ -266,6 +266,8 @@ return function(target_name)
         if target_name == "wswan" then
             s = s .. [[
   --hide-linear-banks              Hide the linear ROM bank grouping.
+  --hide-separate-iram             Hide separate mono/color IRAM
+                                   areas.
 ]]
         end
         s = s .. [[

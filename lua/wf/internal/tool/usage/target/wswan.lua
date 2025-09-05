@@ -49,8 +49,10 @@ target.address_ranges_to_banks = function(ranges, args, config)
         if ranges[1][2] >= 0x4000 then
             bank_iram.range[2] = 0x0000ffff
             bank_iram.size = 65536
-            table.insert(banks, {name="Mono area", depth=1, range={0x00000000, 0x00003fff}, size=16384, mask=0xFFFF, duplicate=true})
-            table.insert(banks, {name="Color area", depth=1, range={0x00004000, 0x0000ffff}, size=49152, mask=0xFFFF, duplicate=true})
+            if not args.hide_separate_iram then
+                table.insert(banks, {name="Mono area", depth=1, range={0x00000000, 0x00003fff}, size=16384, mask=0xFFFF, duplicate=true})
+                table.insert(banks, {name="Color area", depth=1, range={0x00004000, 0x0000ffff}, size=49152, mask=0xFFFF, duplicate=true})
+            end
         end
     end
 
