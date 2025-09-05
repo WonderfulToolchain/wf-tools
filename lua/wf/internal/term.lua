@@ -3,9 +3,17 @@
 
 --- Terminal library.
 
+local compat = require("pl.compat")
+local is_tty = true
+if not compat.is_windows then
+    local posix_stdio = require("posix.stdio")
+    local posix_unistd = require("posix.unistd")
+    is_tty = posix_unistd.isatty(posix_stdio.fileno(io.stdin))
+end
+
 local M = {}
 
-M.use_color = #(os.getenv("NO_COLOR") or "") <= 0
+M.use_color = (#(os.getenv("NO_COLOR") or "") <= 0) and is_tty
 
 local ansi_prefix = string.char(27) .. "["
 local function wrap_ansi_code(code)
