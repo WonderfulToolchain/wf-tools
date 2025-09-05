@@ -17,7 +17,7 @@ local target = {}
 --    +- Bank $FF
 
 target.load_elf = function(file)
-    return wfelf.ELF(file, wfelf.ELFCLASS32, wfelf.ELFDATA2LSB, wfelf.EM_386)
+    return wfelf.ELF(file, wfelf.ELFCLASS32, wfelf.ELFDATA2LSB, wfelf.EM_386, wfelf.ET_EXEC)
 end
 
 target.group_address_ranges = {

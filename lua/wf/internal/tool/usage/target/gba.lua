@@ -6,7 +6,7 @@ local wfelf = require('wf.internal.elf')
 local target = {}
 
 target.load_elf = function(file)
-    return wfelf.ELF(file, wfelf.ELFCLASS32, wfelf.ELFDATA2LSB, wfelf.EM_ARM)
+    return wfelf.ELF(file, wfelf.ELFCLASS32, wfelf.ELFDATA2LSB, wfelf.EM_ARM, wfelf.ET_EXEC)
 end
 
 target.group_address_ranges = {

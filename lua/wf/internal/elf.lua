@@ -139,7 +139,7 @@ function M.read_string(file, section, offset)
     end
 end
 
-function ELF:_init(file, expected_bitness, expected_endianness, expected_machine)
+function ELF:_init(file, expected_bitness, expected_endianness, expected_machine, expected_type)
     if file ~= nil then
         -- ident
         local magic, bitness, endianness, cc, os_abi, os_abi_version = string.unpack(
@@ -167,6 +167,9 @@ function ELF:_init(file, expected_bitness, expected_endianness, expected_machine
         )
         if expected_machine ~= nil and expected_machine ~= self.machine then
             log.fatal("invalid elf machine: " .. self.machine .. ", expected " .. expected_machine)
+        end
+        if expected_type ~= nil and expected_type ~= self.type then
+            log.fatal("invalid elf type: " .. self.type .. ", expected " .. expected_type)
         end
         -- phdr
         self.phdr = {}
