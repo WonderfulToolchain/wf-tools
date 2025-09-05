@@ -37,6 +37,23 @@ targets.gba.address_ranges_to_banks = function(ranges, config)
     return banks
 end
 
+targets.wwitch = {}
+targets.wwitch.load_elf = function(file)
+    return wfelf.ELF(file, wfelf.ELFCLASS32, wfelf.ELFDATA2LSB, wfelf.EM_386)
+end
+
+targets.wwitch.group_address_ranges = {
+    {0x00000000, 0x0000ffff},
+    {0x00010000, 0x0001ffff}
+}
+
+targets.wwitch.address_ranges_to_banks = function(ranges, config)
+    return {
+        {name="Code", range={0x00000000, 0x0000ffff}, size=65536, mask=0xffff},
+        {name="Data", range={0x00010000, 0x0001ffff}, size=65536, mask=0xffff}
+    }
+end
+
 -- IRAM
 -- +- Mono
 -- +- Color

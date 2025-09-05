@@ -8,7 +8,7 @@ local utils = require('pl.utils')
 local wfmath = require('wf.internal.math')
 local wfpackage = require('wf.internal.package')
 local wwitch = require('wf.internal.platform.wwitch')
-local log = require('wf.itnernal.log')
+local log = require('wf.internal.log')
 
 local function mkfent_elf_to_binary(in_filename)
     local tmp_filename = os.tmpname()
