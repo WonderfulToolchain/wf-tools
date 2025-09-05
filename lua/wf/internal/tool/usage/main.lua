@@ -71,15 +71,15 @@ local function print_text_output(banks, usage_ranges, args)
         end
     end
 
-    local sections = {
-        {name="Section", width=sections_section_width+1},
-        {name="Range", width=max_address_width * 2 + 8 + 2, align="center"},
-        {name="Size", width=max_size_width + 1, align="right"},
-        {name="Used", width=max_size_width + 1, align="right"},
-        {name="Used%", width=6, align="right"},
-        {name="Free", width=max_size_width + 1, align="right"},
-        {name="Free%", width=6, align="right"},
-    }
+    local sections = {}
+    table.insert(sections, {name="Section", width=sections_section_width+1})
+    if not args.compact then table.insert(sections, {name="Range", width=max_address_width * 2 + 8 + 2, align="center"}) end
+    if not args.compact then table.insert(sections, {name="Size", width=max_size_width + 1, align="right"}) end
+    table.insert(sections, {name="Used", width=max_size_width + 1, align="right"})
+    if not args.compact then table.insert(sections, {name="Used%", width=6, align="right"}) end
+    table.insert(sections, {name="Free", width=max_size_width + 1, align="right"})
+    table.insert(sections, {name="Free%", width=6, align="right"})
+
     local print_section = function(data)
         for i,sec in ipairs(sections) do
             local s = data[i]
@@ -102,7 +102,7 @@ local function print_text_output(banks, usage_ranges, args)
     print_section(tablex.map(function(s) return ("-"):rep(s.width) end, sections))
 
     for i,bank in ipairs(banks) do
-        local output = {"","","","","","",""}
+        local output = {}
 
         local s = ""
         -- add tree to name
@@ -129,9 +129,11 @@ local function print_text_output(banks, usage_ranges, args)
         local addr_f = "%0" .. address_width .. "X"
         local bank_mask = bank.mask or -1
 
-        output[1] = s .. bank.name .. wfterm.reset()
-        output[2] = string.format("0x" .. addr_f .. " -> 0x" .. addr_f, bank.range[1] & bank_mask, bank.range[2] & bank_mask)
-        output[3] = string.format("%d", bank.size)
+        table.insert(output, s .. bank.name .. wfterm.reset())
+        if not args.compact then
+            table.insert(output, string.format("0x" .. addr_f .. " -> 0x" .. addr_f, bank.range[1] & bank_mask, bank.range[2] & bank_mask))
+            table.insert(output, string.format("%d", bank.size))
+        end
 
         local minigraph = Graph(32, 1, bank.size)
         local used_bytes = 0
@@ -143,14 +145,16 @@ local function print_text_output(banks, usage_ranges, args)
         end
         iterate_used_areas_without_duplicates(bank, usage_ranges, mark_used)
 
+        if args.compact and used_bytes == 0 then goto continue end
+
         local free_bytes = bank.size - used_bytes
         local used_percentage = math.floor(used_bytes * 100 / bank.size)
         local free_percentage = 100 - used_percentage
 
-        output[4] = string.format("%d", used_bytes)
-        output[5] = string.format("%d%%", used_percentage)
-        output[6] = string.format("%d", free_bytes)
-        output[7] = string.format("%d%%", free_percentage)
+        table.insert(output, string.format("%d", used_bytes))
+        if not args.compact then table.insert(output, string.format("%d%%", used_percentage)) end
+        table.insert(output, string.format("%d", free_bytes))
+        table.insert(output, string.format("%d%%", free_percentage))
 
         if args.graph then table.insert(output, "|" .. minigraph:generate_ascii_text() .. "|") end
 
@@ -251,6 +255,7 @@ return function(target_name)
         local s = [[
 <file> ...: analyze ROM memory usage
   <file>        (string)           File to analyze.
+  -C,--compact                     Compact display mode.
   -c,--config   (optional string)  Optional configuration file name;
                                    wfconfig.toml is used by default.
   -d,--depth    (optional number)  Maximum depth to display.
