@@ -194,7 +194,7 @@ return function(target_name)
             log.fatal("could not open '" .. args.input .. "' for reading")
         end
 
-        local elf = target.load_elf(elf_file)
+        local elf = target.load_elf(elf_file, wfelf.PARSE_SECTIONS)
         local config = {}
         local config_filename = args.config or "wfconfig.toml"
         if (args.config ~= nil) or path.exists(config_filename) then

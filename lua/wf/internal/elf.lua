@@ -81,6 +81,11 @@ M.R_386_SEGRELATIVE = 48
 M.R_386_OZSEG16 = 80
 M.R_386_OZRELSEG16 = 81
 
+M.PARSE_SECTIONS = 0x1
+M.PARSE_SYMBOLS = 0x2
+M.PARSE_STRTABS = 0x4
+M.PARSE_ALL = 0xFFFFFFFF
+
 local ELF = class()
 M.ELF = ELF
 
@@ -149,7 +154,7 @@ function M.read_string(file, section, offset)
     end
 end
 
-function ELF:_init(file, expected_bitness, expected_endianness, expected_machine, expected_type)
+function ELF:_init(file, flags, expected_bitness, expected_endianness, expected_machine, expected_type)
     if file ~= nil then
         -- ident
         local magic, bitness, endianness, cc, os_abi, os_abi_version = string.unpack(
@@ -187,7 +192,7 @@ function ELF:_init(file, expected_bitness, expected_endianness, expected_machine
         self.phdr = {}
         if self.phnum > 0 then
             if self.phentsize ~= string.packsize(pack.phent) then
-                log.fatal("invalid phdr size: " .. self.phentsize .. ", expected " .. string.packsize(pack.phent))
+                log.fatal("invalid program header entry size: " .. self.phentsize .. ", expected " .. string.packsize(pack.phent))
             end
             file:seek("set", self.phoff)
             for i=1,self.phnum do
@@ -207,55 +212,67 @@ function ELF:_init(file, expected_bitness, expected_endianness, expected_machine
             end
         end
 
-        -- Section headers
         local strtab, symtab
 
-        self.shdr = {}
-        if self.shnum > 0 then
-            if self.shentsize ~= string.packsize(pack.shent) then
-                log.fatal("invalid shdr size: " .. self.shentsize .. ", expected " .. string.packsize(pack.shent))
-            end
-            file:seek("set", self.shoff)
-            for i=1,self.shnum do
-                local shdr = {}
-                shdr.name, shdr.type, shdr.flags, shdr.addr, shdr.offset,
-                shdr.size, shdr.link, shdr.info, shdr.addralign, shdr.entsize = string.unpack(
-                    pack.shent, file:read(self.shentsize)
-                )
-                self.shdr[i] = shdr
-                if shdr.type == M.SHT_SYMTAB then
-                    symtab = shdr
+        if flags & M.PARSE_SECTIONS then
+            self.shdr = {}
+            if self.shnum > 0 then
+                if self.shentsize ~= string.packsize(pack.shent) then
+                    log.fatal("invalid section header entry size: " .. self.shentsize .. ", expected " .. string.packsize(pack.shent))
+                end
+                file:seek("set", self.shoff)
+                for i=1,self.shnum do
+                    local shdr = {}
+                    shdr.name, shdr.type, shdr.flags, shdr.addr, shdr.offset,
+                    shdr.size, shdr.link, shdr.info, shdr.addralign, shdr.entsize = string.unpack(
+                        pack.shent, file:read(self.shentsize)
+                    )
+                    self.shdr[i] = shdr
+                    if shdr.type == M.SHT_SYMTAB then
+                        symtab = shdr
+                    end
                 end
             end
-        end
-        if symtab ~= nil then
-            strtab = self.shdr[symtab.link + 1]
+            if symtab ~= nil then
+                strtab = self.shdr[symtab.link + 1]
+            end
         end
 
         local shstrtab = self.shdr[self.shstrndx + 1]
 
-        -- Parse shdr names
-        for i=1,#self.shdr do
-            self.shdr[i].name = M.read_string(file, shstrtab, self.shdr[i].name)
+        if flags & M.PARSE_SYMBOLS then
+            self.symbols = {}
+            local symtab_count = symtab.size / symtab.entsize
+            if symtab.entsize ~= string.packsize(pack.sym) then
+                log.fatal("invalid symtab entry size: " .. self.shentsize .. ", expected " .. string.packsize(pack.shent))
+            end
+            file:seek("set", symtab.offset)
+            for i=1,symtab_count do
+                local sym = {}
+                if pack.w == 8 then
+                    sym.name, sym.info, sym.other, sym.shndx, sym.value, sym.size = string.unpack(
+                        pack.sym, file:read(symtab.entsize)
+                    )
+                else
+                    sym.name, sym.value, sym.size, sym.info, sym.other, sym.shndx = string.unpack(
+                        pack.sym, file:read(symtab.entsize)
+                    )
+                end
+                self.symbols[i] = sym
+            end
         end
 
-        -- Symbol table
-        self.symbols = {}
-        local symtab_count = symtab.size / symtab.entsize
-        for i=1,symtab_count do
-            local sym = {}
-            file:seek("set", symtab.offset + ((i - 1) * symtab.entsize))
-            if pack.w == 8 then
-                sym.name, sym.info, sym.other, sym.shndx, sym.value, sym.size = string.unpack(
-                    pack.sym, file:read(symtab.entsize)
-                )
-            else
-                sym.name, sym.value, sym.size, sym.info, sym.other, sym.shndx = string.unpack(
-                    pack.sym, file:read(symtab.entsize)
-                )
+        if flags & M.PARSE_STRTABS then
+            if flags & M.PARSE_SECTIONS then
+                for i=1,#self.shdr do
+                    self.shdr[i].name = M.read_string(file, shstrtab, self.shdr[i].name)
+                end
             end
-            sym.name = M.read_string(file, strtab, sym.name)
-            table.insert(self.symbols, sym)
+            if flags & M.PARSE_SYMBOLS then
+                for i=1,#self.symbols do
+                    self.symbols[i].name = M.read_string(file, strtab, self.symbols[i].name)
+                end
+            end
         end
     end
 end

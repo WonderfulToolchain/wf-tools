@@ -343,7 +343,7 @@ local function run_linker(args, platform)
         log.exit_if_fatal()
     end
 
-    local elf = wfelf.ELF(elf_file, wfelf.ELFCLASS32, wfelf.ELFDATA2LSB, wfelf.EM_386, wfelf.ET_REL)
+    local elf = wfelf.ELF(elf_file, wfelf.PARSE_ALL, wfelf.ELFCLASS32, wfelf.ELFDATA2LSB, wfelf.EM_386, wfelf.ET_REL)
 
     local default_alloc_type = nil
     local default_alloc_bank = nil
