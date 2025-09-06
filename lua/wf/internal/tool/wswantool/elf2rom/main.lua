@@ -540,8 +540,6 @@ local function run_linker(args, platform)
         if sym.shndx == wfelf.SHN_XINDEX then
             log.error("unsupported ELF SHN_XINDEX (as a workaround, disable -ffunction-sections, -fdata-sections, or both)")
         end
-        local symbol_type = sym.info & 0xF
-
         local section = sections[sym.shndx + 1]
         local symbol = wfsymbol.Symbol({section=section, elf=sym, name=sym.name or ""})
         symbols_by_index[i] = symbol
@@ -924,7 +922,9 @@ local function run_linker(args, platform)
         end
 
         -- Populate symbol table and create ELF entries for missing symbols.
-        for _, sym in pairs(symbols_by_index) do
+        local function introduce_symbol(sym, append)
+            if sym.added ~= nil then return end
+
             if sym.elf == nil then
                 if sym.value ~= nil then
                     sym.elf = {
@@ -943,9 +943,16 @@ local function run_linker(args, platform)
             else
                 sym.elf.name = 0
             end
+
+            if append and sym.elf.name ~= 0 then
+                table.insert(symbols_by_index, sym)
+            end
+            sym.added = true
         end
 
-        -- TODO: Emit new symbols.
+        for _, sym in pairs(symbols_by_index) do introduce_symbol(sym, false) end
+        for _, sym in pairs(symbols) do introduce_symbol(sym, true) end
+
         elf.shdr = {}
         local shdr_mapping = {} -- old -> new
         for i=1,#old_shdr do
