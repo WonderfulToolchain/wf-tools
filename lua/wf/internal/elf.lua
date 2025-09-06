@@ -113,9 +113,11 @@ local function get_packing(header)
         if w == 8 then
             pack.phent = e .. "I4I4I8I8I8I8I8I8"
             pack.shent = e .. "I4I4I8I8I8I8I4I4I8I8"
+            pack.sym = e .. "I4BBI2I8I8"
         else
             pack.phent = e .. "I4I4I4I4I4I4I4I4"
             pack.shent = e .. "I4I4I4I4I4I4I4I4I4I4"
+            pack.sym = e .. "I4I4I4BBI2"
         end
         packing_cache[key] = pack
     end
@@ -123,6 +125,8 @@ local function get_packing(header)
 end
 
 function M.read_string(file, section, offset)
+    if section == nil or offset == 0 then return "" end
+    
     file:seek("set", section.offset + offset)
     local s = ""
     while true do
@@ -159,7 +163,8 @@ function ELF:_init(file, expected_bitness, expected_endianness, expected_machine
         self.os_abi = os_abi
         self.os_abi_version = os_abi_version
         local pack = get_packing(self)
-        -- ehdr
+
+        -- ELF header
         self.type, self.machine, self.version, self.entry,
         self.phoff, self.shoff, self.flags, self.ehsize,
         self.phentsize, self.phnum, self.shentsize, self.shnum, self.shstrndx = string.unpack(
@@ -171,7 +176,8 @@ function ELF:_init(file, expected_bitness, expected_endianness, expected_machine
         if expected_type ~= nil and expected_type ~= self.type then
             log.fatal("invalid elf type: " .. self.type .. ", expected " .. expected_type)
         end
-        -- phdr
+
+        -- Program headers
         self.phdr = {}
         if self.phnum > 0 then
             if self.phentsize ~= string.packsize(pack.phent) then
@@ -180,7 +186,7 @@ function ELF:_init(file, expected_bitness, expected_endianness, expected_machine
             file:seek("set", self.phoff)
             for i=1,self.phnum do
                 local phdr = {}
-                if w == 8 then
+                if pack.w == 8 then
                     phdr.type, phdr.flags, phdr.offset, phdr.vaddr, phdr.paddr,
                     phdr.filesz, phdr.memsz, phdr.align = string.unpack(
                         pack.phent, file:read(self.phentsize)
@@ -194,7 +200,10 @@ function ELF:_init(file, expected_bitness, expected_endianness, expected_machine
                 self.phdr[i] = phdr
             end
         end
-        -- shdr
+
+        -- Section headers
+        local strtab, symtab
+
         self.shdr = {}
         if self.shnum > 0 then
             if self.shentsize ~= string.packsize(pack.shent) then
@@ -208,9 +217,40 @@ function ELF:_init(file, expected_bitness, expected_endianness, expected_machine
                     pack.shent, file:read(self.shentsize)
                 )
                 self.shdr[i] = shdr
+                if shdr.type == M.SHT_SYMTAB then
+                    symtab = shdr
+                end
             end
         end
-        -- TODO: process strtab/symtab
+        if symtab ~= nil then
+            strtab = self.shdr[symtab.link + 1]
+        end
+
+        local shstrtab = self.shdr[self.shstrndx + 1]
+
+        -- Parse shdr names
+        for i=1,#self.shdr do
+            self.shdr[i].name = M.read_string(file, shstrtab, self.shdr[i].name)
+        end
+
+        -- Symbol table
+        self.symbols = {}
+        local symtab_count = symtab.size / symtab.entsize
+        for i=1,symtab_count do
+            local sym = {}
+            file:seek("set", symtab.offset + ((i - 1) * symtab.entsize))
+            if pack.w == 8 then
+                sym.name, sym.info, sym.other, sym.shndx, sym.value, sym.size = string.unpack(
+                    pack.sym, file:read(symtab.entsize)
+                )
+            else
+                sym.name, sym.value, sym.size, sym.info, sym.other, sym.shndx = string.unpack(
+                    pack.sym, file:read(symtab.entsize)
+                )
+            end
+            sym.name = M.read_string(file, strtab, sym.name)
+            table.insert(self.symbols, sym)
+        end
     end
 end
 
@@ -264,6 +304,36 @@ function ELF:write_header(file)
             shdr.name, shdr.type, shdr.flags, shdr.addr, shdr.offset,
             shdr.size, shdr.link, shdr.info, shdr.addralign, shdr.entsize
         ))
+    end
+end
+
+local StringTable = class()
+M.StringTable = StringTable
+
+function StringTable:_init()
+    self._strings_ordered = {}
+    self.strings = {[""]=0}
+    self.len = 1
+end
+
+function StringTable:put(s)
+    if s == nil then return 0 end
+    -- TODO: support substrings
+    local pos = self.strings[s]
+    if pos == nil then
+        pos = self.len
+        self.strings[s] = pos
+        self.len = self.len + #s + 1
+        table.insert(self._strings_ordered, s)
+    end
+    return pos
+end
+
+function StringTable:write(f)
+    local zero = string.char(0)
+    f:write(zero)
+    for i=1,#self._strings_ordered do
+        f:write(self._strings_ordered[i], zero)
     end
 end
 

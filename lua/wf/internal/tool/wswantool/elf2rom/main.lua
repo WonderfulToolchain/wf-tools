@@ -427,19 +427,14 @@ local function run_linker(args, platform)
     -- Allocate sections.
     local sections = {}
     local sections_by_name = {}
-    local shstrtab = elf.shdr[elf.shstrndx + 1]
-    local strtab, symtab
 
     local retained_sections = {}
     local allocated_sections = {}
 
     for i=1,#elf.shdr do
         local shdr = elf.shdr[i]
-        if shdr.type == wfelf.SHT_SYMTAB then
-            symtab = shdr
-            strtab = elf.shdr[shdr.link + 1]
-        elseif (shdr.size > 0) then
-            local section_name = wfelf.read_string(elf_file, shstrtab, shdr.name)
+        if (shdr.size > 0) then
+            local section_name = shdr.name
             local data
             local data_empty = 0
             if shdr.type == wfelf.SHT_PROGBITS then
@@ -528,7 +523,7 @@ local function run_linker(args, platform)
     for i=1,#elf.shdr do
         if sections[i] == nil then
             local shdr = elf.shdr[i]
-            local section_name = clean_section_name(wfelf.read_string(elf_file, shstrtab, shdr.name))
+            local section_name = clean_section_name(shdr.name)
             if sections_by_name[section_name] ~= nil then
                 sections[i] = sections_by_name[section_name]
             end
@@ -538,31 +533,19 @@ local function run_linker(args, platform)
     log.exit_if_fatal()
 
     -- Parse symbol table.
-    local symbols_elf_idx = {}
-    local symbols = {} 
-    local symtab_count = symtab.size / symtab.entsize
-    for i=1,symtab_count do
-        local sym = {}
-        elf_file:seek("set", symtab.offset + ((i - 1) * symtab.entsize))
-        sym.name, sym.value, sym.size, sym.info, sym.other, sym.shndx = string.unpack(
-            "<I4I4I4BBI2", elf_file:read(symtab.entsize)
-        )
+    local symbols_by_index = {}
+    local symbols = {}
+    for i=1,#elf.symbols do
+        local sym = elf.symbols[i]
         if sym.shndx == wfelf.SHN_XINDEX then
             log.error("unsupported ELF SHN_XINDEX (as a workaround, disable -ffunction-sections, -fdata-sections, or both)")
         end
         local symbol_type = sym.info & 0xF
-        local symbol_name
-        if symbol_type == wfelf.STT_SECTION then
-            symbol_name = wfelf.read_string(elf_file, shstrtab, elf.shdr[sym.shndx + 1].name)
-        else
-            symbol_name = wfelf.read_string(elf_file, strtab, sym.name)
-        end
-        if #symbol_name > 0 then
-            local section = sections[sym.shndx + 1]
-            local symbol = wfsymbol.Symbol({section=section, elf=sym, name=symbol_name})
-            symbols_elf_idx[i] = symbol
-            symbols[symbol_name] = symbol
-        end
+
+        local section = sections[sym.shndx + 1]
+        local symbol = wfsymbol.Symbol({section=section, elf=sym, name=sym.name or ""})
+        symbols_by_index[i] = symbol
+        symbols[sym.name] = symbol
     end
 
     -- Parse relocation table.
@@ -573,7 +556,7 @@ local function run_linker(args, platform)
         if shdr.type == wfelf.SHT_REL then
             local target_section = sections[shdr.info + 1]
             if target_section == nil then
-                log.error("could not find target for relocation section " .. wfelf.read_string(elf_file, shstrtab, elf.shdr[i].name))
+                log.error("could not find target for relocation section " .. elf.shdr[i].name)
             end
             if target_section.empty > 0 then
                 target_section.empty = 0
@@ -584,7 +567,7 @@ local function run_linker(args, platform)
                 local r_offset, r_type, r_sym = string.unpack(
                     "<I4BI3", elf_file:read(shdr.entsize)
                 )
-                local symbol = symbols_elf_idx[r_sym + 1]
+                local symbol = symbols_by_index[r_sym + 1]
                 table.insert(relocations, {
                     ["offset"] = r_offset,
                     ["type"] = r_type,
@@ -638,7 +621,7 @@ local function run_linker(args, platform)
                 retained_sections[i] = true
 
                 if section_children[i] ~= nil then
-                    for i2,v2 in pairs(section_children[i]) do
+                    for i2, _ in pairs(section_children[i]) do
                         if retained_sections[i2] ~= true then
                             next_retained_sections[i2] = true
                         end
@@ -750,7 +733,7 @@ local function run_linker(args, platform)
             if not symbol_found then
                 if symbols_not_found[symbol.name] == nil then
                     symbols_not_found[symbol.name] = true
-                    log.error("could not locate symbol: " .. symbol.name)
+                    log.error("could not find symbol: " .. symbol.name)
                 end
             end
         end
@@ -931,16 +914,48 @@ local function run_linker(args, platform)
         local old_shdr = elf.shdr
         local old_shstrndx = elf.shstrndx
 
+        local shstrtab = wfelf.StringTable()
+        local strtab = wfelf.StringTable()
+
+        -- Populate section string table.
+        for i=1,#old_shdr do
+            local shdr = old_shdr[i]
+            shdr.name = shstrtab:put(shdr.name)
+        end
+
+        -- Populate symbol table and create ELF entries for missing symbols.
+        for _, sym in pairs(symbols_by_index) do
+            if sym.elf == nil then
+                if sym.value ~= nil then
+                    sym.elf = {
+                        value=sym.value,
+                        size=0,
+                        info=wfelf.STT_NOTYPE,
+                        other=0,
+                        shndx=wfelf.SHN_ABS,
+                        name=sym.name
+                    }
+                end
+            end
+
+            if sym.elf ~= nil and sym.elf.type ~= wfelf.STT_SECTION then
+                sym.elf.name = strtab:put(sym.elf.name)
+            else
+                sym.elf.name = 0
+            end
+        end
+
         -- TODO: Emit new symbols.
         elf.shdr = {}
         local shdr_mapping = {} -- old -> new
         for i=1,#old_shdr do
             local shdr = old_shdr[i]
             local add_shdr = false
+
             if shdr.type == wfelf.SHT_PROGBITS or shdr.type == wfelf.SHT_NOBITS or shdr.type == wfelf.SHT_NULL then
                 local section = sections[i]
                 if section ~= nil and section.input_alloc then
-                    local section_name = wfelf.read_string(elf_file, shstrtab, shdr.name)
+                    local section_name = section.name
                     local section_symbol = wfsymbol.Symbol({section=section, name=""})
 
                     local address = get_vma_address(section_symbol)
@@ -964,22 +979,29 @@ local function run_linker(args, platform)
                     out_file:write(section.data)
                 end
                 add_shdr = true
-            elseif shdr.type == wfelf.SHT_STRTAB then
-                elf_file:seek("set", shdr.offset)
+            elseif i == old_shstrndx+1 then
+                shdr.size = shstrtab.len
                 shdr.offset = offset
 
                 out_file:seek("set", offset)
-                out_file:write(elf_file:read(shdr.size))
+                shstrtab:write(out_file)
+                add_shdr = true
+            elseif shdr.type == wfelf.SHT_STRTAB then
+                shdr.size = strtab.len
+                shdr.offset = offset
+
+                out_file:seek("set", offset)
+                strtab:write(out_file)
                 add_shdr = true
             elseif shdr.type == wfelf.SHT_SYMTAB then
                 -- Emit new symbol table
                 local symtab_pack = "<I4I4I4BBI2"
-                symtab.entsize = string.packsize(symtab_pack)
-                symtab.size = 0
-                symtab.offset = offset
+                shdr.entsize = string.packsize(symtab_pack)
+                shdr.size = 0
+                shdr.offset = offset
                 out_file:seek("set", offset)
 
-                for _, symbol in pairs(symbols_elf_idx) do
+                for _, symbol in pairs(symbols_by_index) do
                     local shndx = wfelf.SHN_ABS
                     if symbol.elf ~= nil then
                         if symbol.elf.shndx ~= nil then
@@ -996,11 +1018,10 @@ local function run_linker(args, platform)
                             symbol.elf.name, symbol.elf.value, symbol.elf.size, symbol.elf.info, symbol.elf.other,
                             shndx
                         ))
-                        symtab.size = symtab.size + symtab.entsize
+                        shdr.size = shdr.size + shdr.entsize
                     end
                 end
 
-                offset = offset + symtab.size
                 add_shdr = true
             end
 
