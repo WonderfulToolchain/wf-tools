@@ -18,6 +18,10 @@ local function sort_usage_ranges_for_deduplication(usage_ranges)
     end)
 end
 
+local function is_section_eligible(shdr)
+    return (shdr.type == wfelf.SHT_PROGBITS or shdr.type == wfelf.SHT_NOBITS) and (shdr.flags & wfelf.SHF_ALLOC ~= 0) and shdr.size > 0
+end
+
 --- @param mark_area_used function (first_address, size).
 local function iterate_used_areas_without_duplicates(bank, usage_ranges, mark_area_used)
     local range = {bank.range[1], bank.range[1] - 1}
@@ -44,7 +48,7 @@ local function iterate_used_areas_without_duplicates(bank, usage_ranges, mark_ar
     mark_area_used(range[1], range[2] + 1 - range[1])
 end
 
-local function print_text_output(banks, usage_ranges, args)
+local function print_text_output(elf, target, banks, usage_ranges, args)
     local sections_section_width = 8
     local max_address_width = 4
     local max_size_width = 4
@@ -123,7 +127,7 @@ local function print_text_output(banks, usage_ranges, args)
             s = s .. "+- " .. wfterm.reset()
         end
 
-        -- local has_higher_depth_below = i < #banks and (banks[i+1].depth or 0) > (bank.depth or 0)
+        local has_higher_depth_below = i < #banks and (banks[i+1].depth or 0) > (bank.depth or 0)
 
         local address_width = #string.format("%X", bank.mask)
         local addr_f = "%0" .. address_width .. "X"
@@ -159,6 +163,45 @@ local function print_text_output(banks, usage_ranges, args)
         if args.graph then table.insert(output, "|" .. minigraph:generate_ascii_text() .. "|") end
 
         print_section(output)
+
+        if args.symbol_top ~= nil and args.symbol_top > 0 and not bank.duplicate then
+            local symbols_by_size = {}
+            for k=1,#elf.symbols do
+                local sym = elf.symbols[k]
+                local shdr = elf.shdr[sym.shndx + 1]
+                if sym.size > 0 and is_section_eligible(shdr) then
+                    local first = shdr.addr
+                    if target.map_address ~= nil then first = target.map_address(first) end
+                    if first ~= nil and first >= bank.range[1] and first <= bank.range[2] then
+                        table.insert(symbols_by_size, {sym.name, sym.size})
+                    end
+                end
+            end
+
+            table.sort(symbols_by_size, function(a, b)
+                if a[2] > b[2] then return true end
+                if a[2] < b[2] then return false end
+                return a[1] < b[1]
+            end)
+
+            local to_print = #symbols_by_size
+            if to_print > args.symbol_top then to_print = args.symbol_top end
+            if to_print > 0 then
+                local max_symbol_width = 0
+                for i=1,to_print do if #symbols_by_size[i][1] > max_symbol_width then max_symbol_width = #symbols_by_size[i][1] end end
+
+                local empty_prefix = (" "):rep((bank.depth or 0) * 3) .. wfterm.fg.bright_black() ..  "|" .. wfterm.reset()
+                local prefix = (" "):rep((bank.depth or 0) * 3) .. wfterm.fg.bright_black() ..  "+- " .. wfterm.reset()
+
+                print(empty_prefix)
+                for i=1,to_print do
+                    local sym = symbols_by_size[i]
+                    print(prefix .. stringx.ljust(sym[1], max_symbol_width) .. stringx.rjust(string.format("%d", sym[2]), 11))
+                end
+                if has_higher_depth_below then print(empty_prefix) end
+            end
+        end
+
         ::continue::
     end
 end
@@ -194,7 +237,11 @@ return function(target_name)
             log.fatal("could not open '" .. args.input .. "' for reading")
         end
 
-        local elf = target.load_elf(elf_file, wfelf.PARSE_SECTIONS)
+        local load_elf_flags = wfelf.PARSE_SECTIONS
+        if args.symbol_top ~= nil then
+            load_elf_flags = load_elf_flags | wfelf.PARSE_SYMBOLS | wfelf.PARSE_STRTABS
+        end
+        local elf = target.load_elf(elf_file, load_elf_flags)
         local config = {}
         local config_filename = args.config or "wfconfig.toml"
         if (args.config ~= nil) or path.exists(config_filename) then
@@ -211,7 +258,7 @@ return function(target_name)
         for i=1,#ranges_template do table.insert(ranges, nil) end
         for i=1,#elf.shdr do
             local shdr = elf.shdr[i]
-            if (shdr.type == wfelf.SHT_PROGBITS or shdr.type == wfelf.SHT_NOBITS) and (shdr.flags & wfelf.SHF_ALLOC ~= 0) and shdr.size > 0 then
+            if is_section_eligible(shdr) then
                 local first = shdr.addr
                 if target.map_address ~= nil then first = target.map_address(first) end
                 if first ~= nil then
@@ -244,7 +291,7 @@ return function(target_name)
         sort_usage_ranges_for_deduplication(usage_ranges)
 
         local banks = target.address_ranges_to_banks(ranges, args, config)
-        print_text_output(banks, usage_ranges, args)
+        print_text_output(elf, target, banks, usage_ranges, args)
 
         if args.graph_detailed then
             print_text_graph_detailed(banks, usage_ranges, args)
@@ -271,6 +318,8 @@ return function(target_name)
 ]]
         end
         s = s .. [[
+  --symbol-top  (optional number)  Show the top N symbols for each
+                                   bank.
   -v,--verbose                     Enable verbose logging.
 ]]
         return s
