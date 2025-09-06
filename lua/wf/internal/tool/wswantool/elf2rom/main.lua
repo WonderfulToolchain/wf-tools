@@ -279,8 +279,8 @@ local function build_iram_data_push(data, joined_entry, platform)
     local flags = 0
     if joined_entry.empty > 0 then flags = flags | 0x8000 end
 
-    data = data .. string.char(length & 0xFF, (length >> 8) & 0xFF)
-    data = data .. string.char(offset & 0xFF, (offset >> 8) & 0xFF)
+    data = data .. string.char(length & 0xFF, (length >> 8) & 0xFF,
+                               offset & 0xFF, (offset >> 8) & 0xFF)
     if platform.mode ~= "bfb" then
         data = data .. string.char(flags & 0xFF, (flags >> 8) & 0xFF)
     end
@@ -560,8 +560,8 @@ local function run_linker(args, platform)
                 target_section.empty = 0
             end
             local count = shdr.size / shdr.entsize
+            elf_file:seek("set", shdr.offset)
             for i=1,count do
-                elf_file:seek("set", shdr.offset + ((i - 1) * shdr.entsize))
                 local r_offset, r_type, r_sym = string.unpack(
                     "<I4BI3", elf_file:read(shdr.entsize)
                 )

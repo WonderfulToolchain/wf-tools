@@ -8,7 +8,7 @@ local log = require('wf.internal.log')
 
 local M = {}
 
-M.ELF_MAGIC = string.char(127) .. "ELF"
+M.ELF_MAGIC = "\x7fELF"
 M.ELFCLASS32 = 1
 M.ELFCLASS64 = 2
 M.ELFDATA2LSB = 1
@@ -62,6 +62,11 @@ M.STT_SECTION = 3
 M.STT_FILE = 4
 M.STT_COMMON = 5
 M.GRP_COMDAT = 1
+M.PF_X = 1
+M.PF_W = 2
+M.PF_R = 4
+M.PF_MASKOS   = 0x0FF00000
+M.PF_MASKPROC = 0xF0000000
 M.PT_NULL = 0
 M.PT_LOAD = 1
 M.PT_DYNAMIC = 2
@@ -70,6 +75,8 @@ M.PT_NOTE = 4
 M.PT_SHLIB = 5
 M.PT_PHDR = 6
 M.PT_TLS = 7
+
+-- IA-16/x86 target defines
 M.R_386_NONE = 0
 M.R_386_32 = 1
 M.R_386_16 = 20
