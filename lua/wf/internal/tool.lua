@@ -11,12 +11,6 @@ local wfutil = require('wf.internal.util')
 local args
 temp_dir = wftempfile.create_directory(true)
 
-function print_verbose(...)
-    if args.verbose then
-        print(table.unpack({...}))
-    end
-end
-
 function execute_verbose(cmd, arg)
     if args.verbose then
         return wfutil.execute(cmd, arg, wfutil.OUTPUT_SHELL)

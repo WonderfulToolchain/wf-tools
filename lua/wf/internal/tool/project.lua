@@ -27,12 +27,12 @@ return function(target)
         local project_name = args.name or path.basename(stringx.rstrip(args.directory, " /\\")):gsub("[ /\\%$]", "")
         local template_path = get_template_path(args)
 
-        print_verbose("copying template files")
+        log.info("copying template files")
         wfpath.copypath(template_path, args.directory)
 
         local makefile_path = path.join(args.directory, "Makefile")
         if path.exists(makefile_path) then
-            print_verbose("patching Makefile")
+            log.info("patching Makefile")
             local makefile_data = utils.readfile(makefile_path, false)
             makefile_data = makefile_data:gsub("(NAME%s+:=%s+)example", "%1" .. project_name)
             utils.writefile(makefile_path, makefile_data, false)
@@ -42,7 +42,7 @@ return function(target)
     local function refresh_ide_project(args)
         local template_path = get_template_path(args)
 
-        print_verbose("copying template files")
+        log.info("copying template files")
         wfpath.copypath(template_path, args.directory, function(name)
             for i,v in ipairs(ide_update_paths) do
                 if stringx.startswith(name, v) then

@@ -14,7 +14,7 @@ local log = require('wf.internal.log')
 local function gbafix_strfield(rom, name, loc, value, vlen, pad)
     if value ~= nil then
         local s = wfstring.pad_to_length(value:upper(), vlen, pad)
-        print_verbose("adjusting " .. name .. " to: " .. s)
+        log.info("adjusting " .. name .. " to: " .. s)
         rom:seek("set", loc)
         rom:write(string.pack("<c" .. tostring(vlen), s))
     end
@@ -50,7 +50,7 @@ local function gbafix_run(args)
     gbafix_strfield(rom, "maker code", 0xB0, config.maker, 2, "0")
     if config.revision ~= nil then
         local v = tonumber(config.revision) & 0xFF
-        print_verbose("adjusting game version to " .. v)
+        log.info("adjusting game version to " .. v)
         rom:seek("set", 0xBC)
         rom:write(string.pack("<B", v))
     end
@@ -67,7 +67,7 @@ local function gbafix_run(args)
         elseif #logo_data ~= 156 then
             log.fatal("could not load logo data: " .. config.logo .. " (invalid size " .. #logo_data .. ")")
         end
-        print_verbose("adjusting logo to " .. config.logo)
+        log.info("adjusting logo to " .. config.logo)
         rom:seek("set", 0x04)
         rom:write(logo_data)
     end
@@ -90,7 +90,7 @@ local function gbafix_run(args)
     rom:seek("set", 0xB2)
     local b2_value = string.byte(rom:read(1))
     if b2_value ~= 0x96 then
-        print_verbose("adjusting 0xB2 fixed value to: 0x96")
+        log.info("adjusting 0xB2 fixed value to: 0x96")
         rom:seek("set", 0xB2)
         rom:write("\x96")
     end
@@ -102,7 +102,7 @@ local function gbafix_run(args)
     for i = 1, #checksum_data do
         checksum = checksum - string.byte(checksum_data, i)
     end
-    print_verbose("adjusting checksum")
+    log.info("adjusting checksum")
     rom:seek("set", 0xBD)
     rom:write(string.char(checksum & 0xFF))
 end

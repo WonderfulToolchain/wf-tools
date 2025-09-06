@@ -634,7 +634,7 @@ local function run_linker(args, platform)
                 if retained_sections[v.input_index] then
                     allocated_sections[i] = v
                 else
-                    log.info("gc: removing section " .. v.name)
+                    log.info("[gc-sections] removing \"%s\"", v.name)
                 end
             end
         end

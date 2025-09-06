@@ -9,7 +9,7 @@ local M = {}
 
 local function print_error(prefix, level, message)
     local info = debug.getinfo(3, "Sl")
-    io.stderr:write(prefix .. level .. ": " .. wfterm.reset() .. info.short_src .. ":" .. info.currentline .. ": " .. message .. "\n")
+    io.stderr:write(prefix, level, ": ", wfterm.reset(), info.short_src, ":", info.currentline, ": ", message, "\n")
     io.stderr:flush()
 end
 
@@ -19,7 +19,8 @@ M.fatal_raised = false
 M.info = function(...)
     local args = {...}
     if M.verbose then
-        print_error("", "info", string.format(table.unpack(args)))
+        io.stderr:write("info: ", string.format(table.unpack(args)), "\n")
+        io.stderr:flush()
     end
 end
 

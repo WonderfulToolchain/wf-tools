@@ -17,12 +17,12 @@ local function mkpsexe_run(args, linker_args)
     local elf_file_root, elf_file_ext = path.splitext(args.input)
     local elf = wfelf.ELF(elf_file, wfelf.ELFCLASS32, wfelf.ELFDATA2LSB, wfelf.EM_MIPS)
 
-    print_verbose(string.format("Entry point: %08X", elf.entry))
+    log.info(string.format("Entry point: %08X", elf.entry))
     local target_text_start = 0xFFFFFFFF
     local target_text_end = 0x00000000
     for i=1,#elf.phdr do
         local phdr = elf.phdr[i]
-		print_verbose(string.format("PHdr %05u: %08X %08X %08X %08X %08X %08X %08X align %X"
+		log.info(string.format("PHdr %05u: %08X %08X %08X %08X %08X %08X %08X align %X"
             , i-1
             , phdr.type
             , phdr.offset
