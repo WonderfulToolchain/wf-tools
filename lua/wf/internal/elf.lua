@@ -115,7 +115,7 @@ local function get_packing(header)
         pack.e = e
         pack.w = w
         pack.ehdr = e .. "I2I2I4I" .. w .. "I" .. w .. "I" .. w .. "I4I2I2I2I2I2I2"
-        if w == 8 then
+        if pack.w == 8 then
             pack.phent = e .. "I4I4I8I8I8I8I8I8"
             pack.shent = e .. "I4I4I8I8I8I8I4I4I8I8"
             pack.sym = e .. "I4BBI2I8I8"
@@ -308,7 +308,7 @@ function ELF:write_header(file)
 
     for i=1,#self.phdr do
         local phdr = self.phdr[i]
-        if w == 8 then
+        if pack.w == 8 then
             file:write(string.pack(pack.phent,
                 phdr.type, phdr.flags, phdr.offset, phdr.vaddr, phdr.paddr,
                 phdr.filesz, phdr.memsz, phdr.align
