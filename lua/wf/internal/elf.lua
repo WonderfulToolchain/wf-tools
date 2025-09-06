@@ -129,16 +129,22 @@ function M.read_string(file, section, offset)
     
     file:seek("set", section.offset + offset)
     local s = ""
+
+    local chunk = ""
+    local chunk_size = 64
+    local i = 1
+
     while true do
-        local cs = file:read(1)
-        if cs == nil then
+        local new_chunk = file:read(chunk_size)
+        if new_chunk == nil then
             return s
         end
-        local c = string.byte(cs)
-        if c == 0 then
-            return s
-        else
-            s = s .. string.char(c)
+        chunk = chunk .. new_chunk
+        while i <= #chunk do
+            if string.byte(chunk, i) == 0 then
+                return chunk:sub(1, i - 1)
+            end
+            i = i + 1
         end
     end
 end
