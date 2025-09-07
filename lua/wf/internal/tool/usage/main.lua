@@ -7,6 +7,7 @@ local stringx = require('pl.stringx')
 local tablex = require('pl.tablex')
 local toml = require('wf.internal.toml')
 local wfelf = require('wf.internal.elf')
+local wfnative = require('wf.internal.native')
 local wfterm = require('wf.internal.term')
 local Graph = require('wf.internal.tool.usage.graph')
 
@@ -188,7 +189,10 @@ local function print_text_output(elf, target, banks, usage_ranges, args)
             if to_print > args.symbol_top then to_print = args.symbol_top end
             if to_print > 0 then
                 local max_symbol_width = 0
-                for i=1,to_print do if #symbols_by_size[i][1] > max_symbol_width then max_symbol_width = #symbols_by_size[i][1] end end
+                for i=1,to_print do
+                    symbols_by_size[i][1] = wfnative.cxa_demangle(symbols_by_size[i][1])
+                    if #symbols_by_size[i][1] > max_symbol_width then max_symbol_width = #symbols_by_size[i][1] end
+                end
 
                 local empty_prefix = (" "):rep((bank.depth or 0) * 3) .. wfterm.fg.bright_black() ..  "|" .. wfterm.reset()
                 local prefix = (" "):rep((bank.depth or 0) * 3) .. wfterm.fg.bright_black() ..  "+- " .. wfterm.reset()

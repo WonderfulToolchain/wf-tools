@@ -9,6 +9,6 @@ dependencies = {
 build = {
    type = "builtin",
    modules = {
-      ["wf.internal.native"] = {"src/lua/native.c"}
+      ["wf.internal.native"] = {"src/lua/native.cpp"}
    }
 }
