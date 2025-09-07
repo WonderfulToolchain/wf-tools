@@ -134,12 +134,6 @@ local function print_text_output(elf, target, banks, usage_ranges, args)
         local addr_f = "%0" .. address_width .. "X"
         local bank_mask = bank.mask or -1
 
-        table.insert(output, s .. bank.name .. wfterm.reset())
-        if not args.compact then
-            table.insert(output, string.format("0x" .. addr_f .. " -> 0x" .. addr_f, bank.range[1] & bank_mask, bank.range[2] & bank_mask))
-            table.insert(output, string.format("%d", bank.size))
-        end
-
         local minigraph = Graph(32, 1, bank.size)
         local used_bytes = 0
         local mark_used = function(from, size)
@@ -156,12 +150,37 @@ local function print_text_output(elf, target, banks, usage_ranges, args)
         local used_percentage = math.floor(used_bytes * 100 / bank.size)
         local free_percentage = 100 - used_percentage
 
+        local color = nil
+        local graph_colored_separately = false
+        if args.color == "free" then
+            if free_percentage == 0 then color = wfterm.fg.red()
+            elseif free_percentage <= 1 then color = wfterm.fg.bright_red()
+            elseif free_percentage <= 10 then color = wfterm.fg.bright_yellow()
+            elseif free_percentage <= 25 then color = wfterm.fg.bright_green()
+            end
+        elseif args.color == "area" then
+            color = bank.color
+        end
+        if color ~= nil then s = s .. color end
+
+        table.insert(output, s .. bank.name)
+        if not args.compact then
+            table.insert(output, string.format("0x" .. addr_f .. " -> 0x" .. addr_f, bank.range[1] & bank_mask, bank.range[2] & bank_mask))
+            table.insert(output, string.format("%d", bank.size))
+        end
+
         table.insert(output, string.format("%d", used_bytes))
         if not args.compact then table.insert(output, string.format("%d%%", used_percentage)) end
         table.insert(output, string.format("%d", free_bytes))
         table.insert(output, string.format("%d%%", free_percentage))
 
-        if args.graph then table.insert(output, "|" .. minigraph:generate_ascii_text() .. "|") end
+        if args.graph then
+            if graph_colored_separately then
+                table.insert(output, wfterm.reset() .. "|" .. minigraph:generate_ascii_text() .. wfterm.reset() .. "|")
+            else
+                table.insert(output, "|" .. minigraph:generate_ascii_text() .. "|")
+            end
+        end
 
         print_section(output)
 
@@ -306,6 +325,9 @@ return function(target_name)
         local s = [[
 <file> ...: analyze ROM memory usage
   <file>        (string)           File to analyze.
+  --color       (optional string)  Use color to augment output:
+                                   - area: Distinguish area types
+                                   - free: Distinguish usage percent
   -C,--compact                     Compact display mode.
   -c,--config   (optional string)  Optional configuration file name;
                                    wfconfig.toml is used by default.

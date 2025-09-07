@@ -3,6 +3,7 @@
 
 local wfelf = require('wf.internal.elf')
 local wfwswan = require('wf.internal.platform.wswan')
+local wfterm = require('wf.internal.term')
 
 local target = {}
 
@@ -44,14 +45,14 @@ end
 target.address_ranges_to_banks = function(ranges, args, config)
     local banks = {}
     if ranges[1] ~= nil then
-        local bank_iram = {name="Internal RAM", range={0x00000000, 0x00003fff}, size=16384, mask=0xFFFF}
+        local bank_iram = {name="Internal RAM", range={0x00000000, 0x00003fff}, size=16384, mask=0xFFFF, color=wfterm.fg.bright_purple()}
         table.insert(banks, bank_iram)
         if ranges[1][2] >= 0x4000 then
             bank_iram.range[2] = 0x0000ffff
             bank_iram.size = 65536
             if not args.hide_separate_iram then
                 table.insert(banks, {name="Mono area", depth=1, range={0x00000000, 0x00003fff}, size=16384, mask=0xFFFF, duplicate=true})
-                table.insert(banks, {name="Color area", depth=1, range={0x00004000, 0x0000ffff}, size=49152, mask=0xFFFF, duplicate=true})
+                table.insert(banks, {name="Color area", depth=1, range={0x00004000, 0x0000ffff}, size=49152, mask=0xFFFF, duplicate=true, color=wfterm.fg.bright_purple()})
             end
         end
     end
@@ -63,13 +64,14 @@ target.address_ranges_to_banks = function(ranges, args, config)
     end
     if sram_size > 0 then
         local sram_last = 0x10000000 + sram_size - 1
-        table.insert(banks, {name="Cartridge SRAM", range={0x10000000, sram_last}, size=sram_size, mask=sram_last-0x10000000, duplicate=true})
+        local sram_mask = sram_last-0x10000000
+        table.insert(banks, {name="Cartridge SRAM", range={0x10000000, sram_last}, size=sram_size, mask=sram_mask, duplicate=(args.depth == nil or args.depth > 0), color=wfterm.fg.bright_cyan()})
         for i=0,sram_size-1,65536 do
             local bank_size = sram_size - i
             if bank_size > 65536 then bank_size = 65536 end
             local sram_first = ((i & 0xFFFF0000) << 4) | 0x10000
             local sram_last = ((i & 0xFFFF0000) << 4) | 0x1ffff
-            table.insert(banks, {name=string.format("SRAM $%02X", i >> 16), depth=1, range={sram_first, sram_last}, size=65536})
+            table.insert(banks, {name=string.format("SRAM $%02X", i >> 16), depth=1, range={sram_first, sram_last}, size=65536, mask=sram_mask, color=wfterm.fg.bright_cyan()})
         end
     end
 
@@ -95,7 +97,7 @@ target.address_ranges_to_banks = function(ranges, args, config)
         local linear_banks_str = "Linear $%0" .. linear_banks_width .. "X"
         local address_mask = (0x10000 << (banks_width_small * 4)) - 1
 
-        table.insert(banks, {name="Cartridge ROM", range={(ranges[3][2] | 0xFFFF) - (banks_count * 65536) + 1, ranges[3][2] | 0xFFFF}, size=rom_size, mask=address_mask, duplicate=true})
+        table.insert(banks, {name="Cartridge ROM", range={(ranges[3][2] | 0xFFFF) - (banks_count * 65536) + 1, ranges[3][2] | 0xFFFF}, size=rom_size, mask=address_mask, duplicate=(args.depth == nil or args.depth > 0), color=wfterm.fg.bright_green()})
 
         local define_rom_bank = function(bank, depth)
             local range_from = ((banks_elf_offset + bank) << 16) + 0x20000000
@@ -104,7 +106,7 @@ target.address_ranges_to_banks = function(ranges, args, config)
             if (rom_size & 65535) ~= 0 and bank == banks_offset then
                 size = (rom_size & 65535)
             end
-            return {name=string.format(banks_str, bank), depth=depth, range={range_from, range_to}, size=size, mask=address_mask}
+            return {name=string.format(banks_str, bank), depth=depth, range={range_from, range_to}, size=size, mask=address_mask, color=wfterm.fg.bright_green()}
         end
 
         local hide_linear_banks = args.hide_linear_banks or (rom_size <= 768*1024)
