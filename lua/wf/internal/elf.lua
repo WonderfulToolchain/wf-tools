@@ -4,6 +4,7 @@
 --- ELF file parser.
 
 local class = require('pl.class')
+local stringx = require("pl.stringx")
 local log = require('wf.internal.log')
 
 local M = {}
@@ -334,6 +335,30 @@ function ELF:write_header(file)
             shdr.name, shdr.type, shdr.flags, shdr.addr, shdr.offset,
             shdr.size, shdr.link, shdr.info, shdr.addralign, shdr.entsize
         ))
+    end
+end
+
+--- Returns two values: preinit_array/init_array/ctors priority, then parsed numeric priority
+M.get_section_priority_by_name = function(name)
+    local priority = 999
+    if stringx.startswith(name, ".preinit_array") then priority = 1
+    elseif stringx.startswith(name, ".init_array") then priority = 2
+    elseif stringx.startswith(name, ".ctors") then priority = 3
+    elseif stringx.startswith(name, ".dtors") then priority = 4
+    elseif stringx.startswith(name, ".fini_array") then priority = 5 end
+
+    local l, ch, r = stringx.rpartition(name, ".")
+    if ch == "." then
+        local r_num = tonumber(r)
+        if r_num and r_num >= 0 and r_num <= 65535 then
+            -- .ctors and .dtors have reverse priority
+            if priority == 3 or priority == 4 then
+                r_num = 65535 - r_num
+            end
+            return priority, r_num
+        end
+    else
+        return priority, -1
     end
 end
 

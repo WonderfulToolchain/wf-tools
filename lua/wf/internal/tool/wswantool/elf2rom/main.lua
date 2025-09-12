@@ -113,6 +113,7 @@ local function get_linear_logical_address(symbol, offset)
     offset = offset or 0
     local linear = get_linear_address(symbol)
     local segment
+
     if symbol.section ~= nil and symbol.section.segment ~= nil and symbol.section.segment.type ~= wfallocator.IRAM then
         segment = entry_plus_offset(symbol.section.segment, 0)
     elseif symbol.section ~= nil and (symbol.section.type == 2 or symbol.section.type == -1) then
@@ -316,6 +317,14 @@ local function build_iram_data(iram, platform)
     return data
 end
 
+local function sort_initfini_sections(a, b)
+    a = wfelf.get_section_priority_by_name(a.name)
+    b = wfelf.get_section_priority_by_name(b.name)
+    if a[1] < b[1] then return true end
+    if a[1] > b[1] then return false end
+    return a[2] < b[2]
+end
+
 local function run_linker(args, platform)
     log.verbose = log.verbose or args.verbose
 
@@ -350,6 +359,11 @@ local function run_linker(args, platform)
     local default_alloc_offset = nil
     local far_sections_supported = false
     local rom_header = nil
+
+    local default_word_align = 2
+    if args.ds_sram or platform.mode == "bfb" then
+        default_word_align = 1
+    end
 
     if platform.mode == "cartridge" then
         allocator_config.rom_banks = config.cartridge.rom_banks
@@ -428,8 +442,10 @@ local function run_linker(args, platform)
     local sections = {}
     local sections_by_name = {}
 
-    local retained_sections = {}
     local allocated_sections = {}
+
+    local init_array_sections = {}
+    local fini_array_sections = {}
 
     for i=1,#elf.shdr do
         local shdr = elf.shdr[i]
@@ -459,7 +475,7 @@ local function run_linker(args, platform)
             if data ~= nil then
                 if shdr.addralign >= 1 then
                     section_entry.align = shdr.addralign
-                elseif #data >= 2 then
+                elseif #data >= 2 and platform.mode ~= "bfb" then
                     section_entry.align = 2
                 end
                 local is_custom_section_name, is_force_retain = apply_section_name_to_entry(section_entry, allocator_config.rom_banks)
@@ -486,6 +502,13 @@ local function run_linker(args, platform)
                                 v.segment_offset = v.segment_offset + #data
                             end
                         end
+                    elseif stringx.startswith(section_name, ".preinit_array")
+                    or stringx.startswith(section_name, ".init_array")
+                    or stringx.startswith(section_name, ".ctors") then
+                        table.insert(init_array_sections, section_entry)
+                    elseif stringx.startswith(section_name, ".fini_array")
+                    or stringx.startswith(section_name, ".dtors") then
+                        table.insert(fini_array_sections, section_entry)
                     elseif stringx.startswith(section_name, ".stext")
                     or stringx.startswith(section_name, ".srodata")
                     or stringx.startswith(section_name, ".sdata")
@@ -504,10 +527,10 @@ local function run_linker(args, platform)
                         section_entry.type = wfallocator.IRAM
                     end
                 elseif is_force_retain then
-                    retained_sections[section_entry.input_index] = true
+                    section_entry.retain = true
                 end
                 if (shdr.flags & wfelf.SHF_GNU_RETAIN) ~= 0 then
-                    retained_sections[section_entry.input_index] = true
+                    section_entry.retain = true
                 end
                 if #data > 0xFFF1 then
                     -- ensure memory cell ((offset & 15) + #data - 1) is always reachable via alignment
@@ -518,6 +541,34 @@ local function run_linker(args, platform)
             sections[i] = section_entry
         end
     end
+
+    local function create_initfini_section(sections, name)
+        local section = {
+            ["name"] = name,
+            ["type"] = default_alloc_type,
+            ["bank"] = default_alloc_bank,
+            ["offset"] = default_alloc_offset,
+            ["data"] = "",
+            ["align"] = default_word_align,
+            ["retain"] = true
+        }
+
+        table.sort(sections, sort_initfini_sections)
+        for _, s in pairs(sections) do
+            s.segment = section
+            s.segment_offset = #section.data
+            s.retain = true
+            section.data = section.data .. s.data
+        end
+
+        return section
+    end
+
+    local init_array_section = create_initfini_section(init_array_sections, "(wf) init array section")
+    local fini_array_section = create_initfini_section(fini_array_sections, "(wf) fini array section")
+    allocator:add(init_array_section)
+    allocator:add(fini_array_section)
+
     -- Link segelf symbols ("symbol!", etc.) by name to their regular variants.
     -- This allows tracking their allocated segment/offset.
     for i=1,#elf.shdr do
@@ -584,12 +635,19 @@ local function run_linker(args, platform)
     if start_symbol == nil then
         log.error("could not find symbol: _start")
     else
-        retained_sections[start_symbol.section.input_index] = true
+        start_symbol.section.retain = true
     end
  
     log.exit_if_fatal()
 
     if gc_enabled then
+        local retained_sections = {}
+        for _, section in pairs(sections) do
+            if section.retain and section.input_index then
+                retained_sections[section.input_index] = true
+            end
+        end
+
         -- Perform garbage collection by using relocation tables as a section usage map.
         local section_children = {} -- section: {sections...}
 
@@ -674,11 +732,8 @@ local function run_linker(args, platform)
         ["type"] = default_alloc_type,
         ["bank"] = default_alloc_bank,
         ["offset"] = default_alloc_offset,
-        ["align"] = 2
+        ["align"] = default_word_align
     }
-    if args.ds_sram or platform.mode == "bfb" then
-        iram_entry.align = 1
-    end
     iram_entry.data = build_iram_data(iram, platform)
     allocator:add(iram_entry)
     allocator:allocate(allocator_config, false)
@@ -693,7 +748,12 @@ local function run_linker(args, platform)
     end
     emit_symbol(symbols, "__wf_heap_start", heap_start)
     emit_symbol(symbols, "__wf_heap_top", heap_start + heap_length)
+
     emit_symbol(symbols, "__wf_data_block", entry_plus_offset(iram_entry, 0), entry_plus_offset(iram_entry, 0) & 0xFFFF0, iram_entry)
+    emit_symbol(symbols, "__init_array_start", entry_plus_offset(init_array_section, 0), entry_plus_offset(init_array_section, 0) & 0xFFFF0, init_array_section)
+    emit_symbol(symbols, "__init_array_end", entry_plus_offset(init_array_section, #init_array_section.data), entry_plus_offset(init_array_section, 0) & 0xFFFF0, init_array_section)
+    emit_symbol(symbols, "__fini_array_start", entry_plus_offset(fini_array_section, 0), entry_plus_offset(fini_array_section, 0) & 0xFFFF0, fini_array_section)
+    emit_symbol(symbols, "__fini_array_end", entry_plus_offset(fini_array_section, #fini_array_section.data), entry_plus_offset(fini_array_section, 0) & 0xFFFF0, fini_array_section)
 
     emit_raw_symbol(symbols, ".debug_frame!", 0)
 
@@ -922,6 +982,7 @@ local function run_linker(args, platform)
         end
 
         -- Populate symbol table and create ELF entries for missing symbols.
+        -- TODO: Support removing symbols.
         local function introduce_symbol(sym, append)
             if sym.added ~= nil then return end
 
