@@ -692,7 +692,7 @@ local function run_linker(args, platform)
                 if retained_sections[v.input_index] then
                     allocated_sections[i] = v
                 else
-                    log.info("[gc-sections] removing \"%s\"", v.name)
+                    log.info("gc-sections: removing \"%s\"", v.name)
                 end
             end
         end
@@ -723,8 +723,10 @@ local function run_linker(args, platform)
     end
 
     local iram = allocator.banks[wfallocator.IRAM][1]
+    local iram_segment = 0x0000
     if args.ds_sram then
         iram = allocator.banks[wfallocator.SRAM][0]
+        iram_segment = 0x1000
     end
 
     local iram_entry = {
@@ -748,6 +750,7 @@ local function run_linker(args, platform)
     end
     emit_symbol(symbols, "__wf_heap_start", heap_start)
     emit_symbol(symbols, "__wf_heap_top", heap_start + heap_length)
+    log.info("reserved %d bytes of heap (%04X:%04X -> %04X:%04X)", heap_length, iram_segment, heap_start, iram_segment, heap_start + heap_length - 1)
 
     emit_symbol(symbols, "__wf_data_block", entry_plus_offset(iram_entry, 0), entry_plus_offset(iram_entry, 0) & 0xFFFF0, iram_entry)
     emit_symbol(symbols, "__init_array_start", entry_plus_offset(init_array_section, 0), entry_plus_offset(init_array_section, 0) & 0xFFFF0, init_array_section)
