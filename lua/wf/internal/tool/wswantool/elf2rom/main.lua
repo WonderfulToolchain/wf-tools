@@ -777,6 +777,7 @@ local function run_linker(args, platform)
         local r_type = relocation.type
         local target_section = relocation.section
         local symbol = relocation.symbol
+        local orig_symbol_name = symbol.name
 
         local symbol_found = symbol:is_defined()
         if not symbol_found then
@@ -792,8 +793,8 @@ local function run_linker(args, platform)
                         if symbols[symbol_key] ~= nil then
                             symbol = symbols[symbol_key]
                             if symbol ~= nil and symbol.section ~= nil then
-                                symbol = wfsymbol.Symbol({value=symbol.section.bank or 0, name=symbol_key})
-                                symbols[symbol_key] = symbol
+                                symbol = wfsymbol.Symbol({value=symbol.section.bank or 0, name=orig_symbol_name})
+                                symbols[orig_symbol_name] = symbol
                                 symbol_found = true
                             end
                         end
@@ -802,9 +803,9 @@ local function run_linker(args, platform)
             end
 
             if not symbol_found then
-                if symbols_not_found[symbol.name] == nil then
-                    symbols_not_found[symbol.name] = true
-                    log.error("could not find symbol: " .. symbol.name)
+                if symbols_not_found[orig_symbol_name] == nil then
+                    symbols_not_found[orig_symbol_name] = true
+                    log.error("could not find symbol: " .. orig_symbol_name)
                 end
             end
         end
