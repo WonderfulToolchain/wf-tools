@@ -886,7 +886,7 @@ local function run_linker(args, platform)
         local rom_bank_first = allocator_config.rom_last_bank + 1 - rom_bank_count
         local rom_size_bytes = rom_bank_count * 0x10000
 
-        if config.cartridge.rom_reserve_bootrom_area and rom_bank_count > 16 then
+        if config.cartridge.rom_reserve_bootrom_area and allocated_rom_bank_count > 16 then
             log.error("fixme: rom_reserve_bootrom_area not supported on > 1 MiB cartridges")
         end
 
