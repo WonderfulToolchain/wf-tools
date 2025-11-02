@@ -281,7 +281,7 @@ local function try_place_entry_inner(banks, entry)
             local next_start_bank = entry.bank
             for i=start_bank-1,start_bank-(limit-1),-1 do
                 next_start_bank = i
-                if not banks[i]:is_empty() then
+                if banks[i] ~= nil and not banks[i]:is_empty() then
                     start_offset = banks[i]:allocation_end() + 1
                     break
                 end
@@ -292,7 +292,7 @@ local function try_place_entry_inner(banks, entry)
             local next_end_bank = entry.bank
             for i=start_bank+1,start_bank+(limit-1),-1 do
                 next_end_bank = i
-                if not banks[i]:is_empty() then
+                if banks[i] ~= nil and not banks[i]:is_empty() then
                     end_offset = banks[i]:allocation_start()
                     break
                 end
@@ -383,7 +383,7 @@ local function try_place_entry_inner(banks, entry)
     end
 end
 
-local function try_place_entry_a(banks, entry)
+local function try_place_entry(banks, entry)
     banks = banks[entry.type]
 
     if entry.type == 2 and entry.bank ~= nil and entry.offset ~= nil then
@@ -420,29 +420,6 @@ local function try_place_entry_a(banks, entry)
     end
 
     return try_place_entry_inner(banks, entry)
-end
-
-local function try_place_entry(config, banks, entry)
-    -- HACK: This should really be done in a better way.
-    if config.bootrom_area_reserved and entry.type == 2 then
-        for i, v in pairs(banks[2]) do
-            if (i & 0xF) == 0xF then
-                v.size = 65536 - 8192
-            end
-        end
-    end
-
-    local result = try_place_entry_a(banks, entry)
-
-    if config.bootrom_area_reserved and entry.type == 2 then
-        for i, v in pairs(banks[2]) do
-            if (i & 0xF) == 0xF then
-                v.size = 65536
-            end
-        end
-    end
-
-    return result
 end
 
 local function calculate_bank_sizes(banks)
@@ -501,8 +478,8 @@ local function init_banks(config)
         if max_bank_count > 128 then max_bank_count = 128 end
     end
     for i=0,max_bank_count-1 do
-        local b = Bank(65536, true)
         local bidx = rom_last_bank - i
+        local b = Bank(65536, true)
         banks[0][bidx] = b
         -- linear bank mapping
         if ((bidx & 0xF) >= 0x4) then
@@ -523,7 +500,7 @@ function Allocator:allocate(config, is_final)
 
     -- Add fixed entries, as we know exactly where they need to go.
     for i, entry in pairs(self.fixed_entries) do
-        if not try_place_entry(config, banks, entry) then
+        if not try_place_entry(banks, entry) then
             log.fatal("could not allocate: " .. get_entry_name(entry))
         end
     end
@@ -554,7 +531,7 @@ function Allocator:allocate(config, is_final)
     end)
 
     for i, entry in pairs(self.entries) do
-        if not try_place_entry(config, banks, entry) then
+        if not try_place_entry(banks, entry) then
             log.fatal("could not allocate: " .. get_entry_name(entry))
         end
     end

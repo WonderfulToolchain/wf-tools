@@ -342,8 +342,7 @@ local function run_linker(args, platform)
     local allocator_config = {
         ["iram_size"] = 65536,
         ["sram_size"] = 0,
-        ["rom_banks"] = 0,
-        ["bootrom_area_reserved"] = config.cartridge.rom_reserve_bootrom_area or false
+        ["rom_banks"] = 0
     }
 
     local elf_file <close> = io.open(args.input, "rb")
@@ -383,6 +382,17 @@ local function run_linker(args, platform)
         }
         allocator:add(rom_header)
 
+        if config.cartridge.rom_reserve_bootrom_area then
+            local rom_reserved = {
+                ["name"] = "(wf) boot ROM area",
+                ["type"] = 0,
+                ["bank"] = allocator_config.rom_last_bank,
+                ["offset"] = 0xE000,
+                ["data"] = string.char(0):rep(0x2000 - 16)
+            }
+            allocator:add(rom_reserved)
+        end
+        
         default_alloc_type = 2
         default_alloc_bank = allocator_config.rom_last_bank >> 4
         far_sections_supported = true
@@ -875,6 +885,10 @@ local function run_linker(args, platform)
         local rom_bank_type, rom_bank_count = romlink_calc_rom_size(config.cartridge.rom_banks or allocator.bank_sizes[0].count or 0)
         local rom_bank_first = allocator_config.rom_last_bank + 1 - rom_bank_count
         local rom_size_bytes = rom_bank_count * 0x10000
+
+        if config.cartridge.rom_reserve_bootrom_area and rom_bank_count > 16 then
+            log.error("fixme: rom_reserve_bootrom_area not supported on > 1 MiB cartridges")
+        end
 
         -- ELF output checks.
         if args.output_elf ~= nil then
