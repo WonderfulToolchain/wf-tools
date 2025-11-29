@@ -34,7 +34,7 @@ function M.file_attributes_to_integer(mode)
         local result = 0
         for i = 1, #mode do
             local flag = mode:sub(i, i)
-            local value = M.FILE_MODE_FLAGS[flag]
+            local value = M.FILE_ATTRIBUTE_FLAGS[flag]
             if value ~= nil then
                 result = result | value
             end
