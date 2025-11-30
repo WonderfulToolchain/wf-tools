@@ -323,7 +323,7 @@ return function(target_name)
 
     local function get_argument_string()
         local s = [[
-<file> ...: analyze ROM memory usage
+<file> ...: analyze program memory usage
   <file>        (string)           File to analyze.
   --color       (optional string)  Use color to augment output:
                                    - area: Distinguish area types
@@ -353,7 +353,7 @@ return function(target_name)
 
     return {
         ["arguments"] = get_argument_string(),
-        ["description"] = "analyze ROM memory usage",
+        ["description"] = "analyze program memory usage",
         ["run"] = run_usage
     }
 end

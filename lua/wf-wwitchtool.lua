@@ -4,6 +4,7 @@
 
 commands = {}
 commands.mkfent = require('wf.internal.tool.wwitchtool.mkfent')
+commands.mkrom = require('wf.internal.tool.wwitchtool.mkrom')
 commands.project = require('wf.internal.tool.project')('wwitch')
 commands.usage = require('wf.internal.tool.usage.main')('wwitch')
 

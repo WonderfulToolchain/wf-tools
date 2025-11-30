@@ -84,7 +84,6 @@ function M.create_fent_header(settings)
         )
 end
 
-
 function M.parse_fent_header(data)
     if data:sub(1,4) ~= "#!ws" or #data < 128 then
         error("not a valid .fx file")
