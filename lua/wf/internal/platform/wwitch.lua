@@ -4,6 +4,7 @@
 --- Helpers for the "wwitch" target.
 
 local log = require("wf.internal.log")
+local stringx = require("pl.stringx")
 local wfmath = require("wf.internal.math")
 local wfstring = require("wf.internal.string")
 local M = {}
@@ -19,6 +20,7 @@ M.FILE_ATTRIBUTE_FLAGS = {
     ["l"] = 0x40, -- Symbolic link.
     ["d"] = 0x80  -- Directory.
 }
+M.FILE_ATTRIBUTE_FLAG_ORDER = "dlismrwx"
 
 --- Convert file attributes to their integer value.
 --- @param number|string mode Input file attribute value.
@@ -80,6 +82,50 @@ function M.create_fent_header(settings)
             0, -- TODO: unknown
             resource_start
         )
+end
+
+
+function M.parse_fent_header(data)
+    if data:sub(1,4) ~= "#!ws" or #data < 128 then
+        error("not a valid .fx file")
+    end
+    
+    local unk1, total_length, xmodem_chunk_count, mode, mtime, unk2, resource_start = string.unpack("< I4 I4 I2 I2 I4 I4 i4", data:sub(64+16+24+1, 128))
+    local resource_length = 0
+    if resource_start >= 0 then
+        resource_length = total_length - resource_start
+        total_length = resource_start
+    end
+
+    if mode < 256 then
+        local mode_i = mode
+        mode = ""
+
+        for i=1,#M.FILE_ATTRIBUTE_FLAG_ORDER do
+            local flag = M.FILE_ATTRIBUTE_FLAG_ORDER:sub(i,i)
+            if (mode_i & M.FILE_ATTRIBUTE_FLAGS[flag]) ~= 0 then
+                mode = mode .. flag
+            end
+        end
+    end
+
+    -- TODO: convert mtime
+
+    local name = wfstring.convert(data:sub(64+1,64+16), wfstring.encoding.utf8, wfstring.encoding.shiftjis)
+    local info = wfstring.convert(data:sub(64+16+1,64+16+24), wfstring.encoding.utf8, wfstring.encoding.shiftjis)
+
+    return {
+        ["name"]=stringx.rstrip(name, string.char(0)),
+        ["info"]=stringx.rstrip(info, string.char(0)),
+        ["mode"]=mode,
+        ["xmodem_chunk_count"]=xmodem_chunk_count,
+        ["length"]=total_length,
+        ["resource_length"]=resource_length
+    }
+end
+
+function M.read_fent_header(file)
+    return M.parse_fent_header(file:read(128))
 end
 
 return M
