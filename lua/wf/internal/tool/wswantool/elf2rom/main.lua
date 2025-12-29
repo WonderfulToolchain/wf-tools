@@ -820,15 +820,20 @@ local function run_linker(args, platform)
                     value = segment << 4
                 end
                 if r_type == wfelf.R_386_32 then
-                    -- debug section workaround: use ELF VMA address
-                    value = get_vma_address(symbol)
+                    -- debug section workaround: use ELF VMA address if debug (not alloc)
+                    if not target_section.input_alloc then
+                        value = get_vma_address(symbol)
+                    end
                     target_section.data = relocate32le(target_section.data, r_offset + 1, function(v) return v + value end)
                 elseif r_type == wfelf.R_386_16 then
                     target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v + value end)
                 elseif r_type == wfelf.R_386_SUB16 then
                     target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return v - value end)
                 elseif r_type == wfelf.R_386_SUB32 then
-                    -- debug section workaround: skip this relocation
+                    -- debug section workaround: skip this relocation if debug (not alloc)
+                    if target_section.input_alloc then
+                        target_section.data = relocate32le(target_section.data, r_offset + 1, function(v) return v - value end)
+                    end
                 elseif r_type == wfelf.R_386_SEG16 then
                     target_section.data = relocate16le(target_section.data, r_offset + 1, function(v) return ((v << 4) + value) >> 4 end)
                 elseif r_type == wfelf.R_386_PC16 then
